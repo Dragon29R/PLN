@@ -5,6 +5,8 @@ import nltk
 from nltk.stem.snowball import SnowballStemmer
 import pandas as pd
 import re
+
+# Remove noise from the dataset
 def remove_noise(df,name):
     df1 = df[df["review_text"].notnull()]
     df2 = df1[df1["review_text"]!=""]
@@ -12,6 +14,8 @@ def remove_noise(df,name):
     df_clean = df3[df3["INADEQUADA"]==0]
     print(str(name)+":",len(df),str(name)+"_clean:",len(df_clean))
     return df_clean
+
+# Plot boxplot of the review_text length
 def plot_boxplot(data,legend):
     sizes = [len(i) for i in data["review_text"]]
     max1 = data[data["review_text"].str.len()==max(sizes)]
@@ -19,10 +23,12 @@ def plot_boxplot(data,legend):
     plt.title(legend)
     plt.savefig("plots/boxplots/"+legend+"_boxplot.png")
 
+# Remove stopwords from the dataset
 def remove_stopwords(data):
     stop_words = set(nltk.corpus.stopwords.words('portuguese'))
     data["review_text"] = data["review_text"].apply(lambda x: ' '.join([word for word in x.split() if word not in stop_words]))
-# remove stop words and apply stemming
+
+# Generate the corpus
 def generate_corpus(df,sw,ps):
     corpus = []
     for i in df.index:
@@ -34,6 +40,8 @@ def generate_corpus(df,sw,ps):
         review = ' '.join([ps.stem(w) for w in review.split() if w not in sw])
         corpus.append(review)
     return corpus
+
+# Generate the wordcloud
 def generateWordCloud(corpus,title):
     wordcloud = WordCloud().generate(" ".join(corpus))
     plt.figure()
@@ -42,6 +50,7 @@ def generateWordCloud(corpus,title):
     plt.axis('off')
     plt.savefig("plots/wordclouds/wordcloud_" + title + ".png")
 
+# Plot wordclouds
 def plot_wordclouds(df):
     sw = set(nltk.corpus.stopwords.words('portuguese'))
     ps = SnowballStemmer('portuguese')
