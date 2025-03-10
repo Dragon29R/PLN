@@ -16,7 +16,7 @@ def nearest_neighbours(train_x,train_y,test_x,test_y, n_neighbours=5):
 def optimize_nearest_neighbours(train_x,train_y,test_x,test_y):
     best_score = 0
     best_n = 0
-    for i in range(1,10):
+    for i in range(1,15):
         score = nearest_neighbours(train_x,train_y,test_x,test_y,n_neighbours=i)
         if score > best_score:
             best_score = score
