@@ -52,6 +52,10 @@ def plot_wordclouds(df):
         df1 = df[df[tag]==1]
         corpus = generate_corpus(df1,sw,ps)
         generateWordCloud(corpus,tag)
+def percentageOfEachTag(df):
+    tags = ["ENTREGA","OUTROS","PRODUTO","CONDICOESDERECEBIMENTO","ANUNCIO"]
+    for tag in tags:
+        print(tag+":",len(df[df[tag]==1])/len(df))
 
 
 if __name__ == '__main__':
@@ -64,10 +68,17 @@ if __name__ == '__main__':
     test_clean = remove_noise(test,"test")
     train_clean = remove_noise(train,"train")
     validation_clean = remove_noise(validation,"validation")
+    test_clean.to_csv("data/test_clean.csv",index=False)
+    train_clean.to_csv("data/train_clean.csv",index=False)
+    validation_clean.to_csv("data/validation_clean.csv",index=False)
     #plot some analysis
     plot_boxplot(train_clean,"train")
     plot_boxplot(test_clean,"test")
     plot_boxplot(validation_clean,"validation")
     #draw wordclouds
     plot_wordclouds(train_clean)
+    print("TRAIN")
+    percentageOfEachTag(train_clean)
+    print("TEST")
+    percentageOfEachTag(test_clean)
 
