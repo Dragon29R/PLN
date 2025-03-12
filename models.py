@@ -1,6 +1,6 @@
 import numpy as np
 
-from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neighbors import KNeighborsClassifier, RadiusNeighborsClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import roc_curve, RocCurveDisplay
@@ -11,11 +11,13 @@ from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 from sklearn.tree import DecisionTreeClassifier
 # extra models check if possible
-from sklearn.ensemble import AdaBoostClassifier, BaggingClassifier, GradientBoostingClassifier
+from sklearn.ensemble import AdaBoostClassifier, BaggingClassifier, GradientBoostingClassifier, RandomForestClassifier, VotingClassifier
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis, QuadraticDiscriminantAnalysis
 from xgboost import XGBClassifier
 from catboost import CatBoostClassifier
 from sklearn.model_selection import cross_val_score, KFold
+from skmultilearn.problem_transform import BinaryRelevance
+from sklearn.svm import SVC
 
 
 import pandas as pd
@@ -106,7 +108,49 @@ def run_extra_models(datasets,results,columns):
                 entry = {"MODEL":model.__class__.__name__,"DATASET":dataset_type,"ACCURACY":cv_results.mean(),'TARGET':column}
                 results = addToDf(results,entry)
     return results
+#predict using multilabel classifier
+def predict_multilabel_classifier(train_x,train_y,test_x,test_y,results,model,model_name):
+    br = BinaryRelevance(classifier=model, require_dense=[False, True])
+    br.fit(train_x, train_y)
+    predictions = br.predict(test_x)
+    accuracy_score1 = accuracy_score(test_y, predictions)
+    f1 = f1_score(test_y, predictions, average='micro')
+    recall = recall_score(test_y, predictions, average='micro')
+    precision = precision_score(test_y, predictions, average='micro')
+    entry = {"MODEL":model_name,"DATASET":"ORIGINAL","ACCURACY":accuracy_score1,"F1":f1,"RECALL":recall,"PRECISION":precision,'TARGET':"All"}
+    results = addToDf(results,entry)
+    return results
+def multilabel_a_lot_of_models(train_x,train_y,test_x,test_y,results):
+    models = [
+        ('KNN', KNeighborsClassifier()),
+        #('Radius Neighbors', RadiusNeighborsClassifier()),
+        ('Decision Tree', DecisionTreeClassifier()),
+        ('SVM', SVC()),
+        ('XGBoost', XGBClassifier()),
+        ('AdaBoost', AdaBoostClassifier(algorithm='SAMME')),
+        ('Bagging', BaggingClassifier()),
+        ('Gradient Boosting', GradientBoostingClassifier()),
+        #('GaussianNB', GaussianNB()),
+        ('random Forest',RandomForestClassifier(random_state=42)),
+        #('Linear Discriminant Analysis', LinearDiscriminantAnalysis()),
+        #('Quadratic Discriminant Analysis', QuadraticDiscriminantAnalysis()),
+        ('CatBoost', CatBoostClassifier(logging_level='Silent'))
+    ]
+    voting = VotingClassifier(estimators=models, voting='soft')
+    #staking = StackingClassifier(estimators=models)
+    models.append(('Voting',voting))
+    #models.append(('Stacking',staking))
+    for model_name,model in models:
+        print("Running model: ", model_name)
+        if model_name == "GaussianNB":
+            results = predict_multilabel_classifier(train_x.toarray(),train_y,test_x,test_y,results,model,model_name)
+        else:
+            results = predict_multilabel_classifier(train_x,train_y,test_x,test_y,results,model,model_name)
+    return results
 
+
+
+#single labeling for each column in singular
 def predict_all_columns(datasets,text_test,function,results,columns):
 
     for column in columns:
@@ -129,11 +173,14 @@ def addToDf(results,entry):
     else:
         results = pd.concat([results, pd.DataFrame([entry]).reindex(columns=results.columns)], ignore_index=True)
     return results
+def generateDf(columns):
+        results = pd.DataFrame([],  columns =  ["MODEL","DATASET","PRECISION", "ACCURACY","F1","RECALL","MODEL_PARAMS","TARGET"])
+        results["TARGET"] = pd.Categorical([], categories=columns)
+        results["DATASET"] = pd.Categorical([], categories=["UNDERSAMPLING", "OVERSAMPLING", "ORIGINAL"])
+        return results
 if __name__ == '__main__':
     columns =["ENTREGA","OUTROS","PRODUTO","CONDICOESDERECEBIMENTO","ANUNCIO"]
-    results = pd.DataFrame([],  columns =  ["MODEL","DATASET","PRECISION", "ACCURACY","F1","RECALL","MODEL_PARAMS","TARGET"])
-    results["TARGET"] = pd.Categorical([], categories=["ENTREGA", "OUTROS", "PRODUTO", "CONDICOESDERECEBIMENTO", "ANUNCIO"])
-    results["DATASET"] = pd.Categorical([], categories=["UNDERSAMPLING", "OVERSAMPLING", "ORIGINAL"])
+    results = generateDf(columns)
     #load the datasets and clean it
     print("runing dataAnalyse.py")
     test = pd.read_csv("data/test_clean.csv")
@@ -143,5 +190,6 @@ if __name__ == '__main__':
     text_train, text_test = vectorize_data(train, test)
     datasets = generate_balanced_data(text_train,train,columns)
     #results = predict_all_columns(datasets,text_test,optimize_nearest_neighbours,results,columns)
-    results =run_extra_models(datasets,results,columns)
+    #results =run_extra_models(datasets,results,columns)
+    results = multilabel_a_lot_of_models(text_train,train[columns],text_test,test[columns],results)
     results.to_csv("results/results.csv")
