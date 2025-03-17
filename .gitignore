@@ -1,3 +1,5 @@
 /plots
 /results
 /catboost_info
+/data
+/__pycache__
