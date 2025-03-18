@@ -1,5 +1,10 @@
 /plots
 /results
 /catboost_info
+<<<<<<< HEAD
 /__pycache__
 /data
+=======
+/data
+/__pycache__
+>>>>>>> a33a169f6a469c03682950d72f5667171fa0c6b5

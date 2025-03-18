@@ -5,6 +5,7 @@ import string
 from spellchecker import SpellChecker
 from nltk.stem import PorterStemmer
 from nltk.corpus import stopwords
+import os
 
 def check_for_nan(data):
     nan_rows = data[data.isna().any(axis=1)]
@@ -19,7 +20,6 @@ def removeNulls(df,name):
     df2 = df1[df1["review_text"]!=""]
     df3 = df2.dropna()
     df_clean = df3[df3["INADEQUADA"]==0]
-    print(str(name)+":",len(df),str(name)+"_clean:",len(df_clean))
     return df_clean
 
 def removeUpper(df):
@@ -80,59 +80,83 @@ def generate_corpus(df,sw,ps):
         corpus.append(review)
     return corpus
 
+def save_datasets(test, train, validation, folder_name):
+    folder_path = os.path.join("data", folder_name)
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+    test.to_csv(f"{folder_path}/test_clean.csv", index=False)
+    train.to_csv(f"{folder_path}/train_clean.csv", index=False)
+    validation.to_csv(f"{folder_path}/validation_clean.csv", index=False)
+
+
 if __name__ == '__main__':
-
-
-    test = pd.read_csv("data/test.csv") 
+    test = pd.read_csv("data/test.csv")
     train = pd.read_csv("data/train.csv")
     validation = pd.read_csv("data/validation.csv")
 
-    test_clean = removeNulls(test,"test")
-    train_clean = removeNulls(train,"train")
-    validation_clean = removeNulls(validation,"validation")
+    techniques = [
+        ("removeUpper", removeUpper),
+        ("removeStopwords", removeStopwords),
+        ("removePonctuation", removePonctuation),
+        ("removeNumbers", removeNumbers),
+        ("normalizeRepeatedChars", normalizeRepeatedChars),
+        ("tokenize_text", tokenize_text),
+        ("lemmatize_text", lemmatize_text),
+        ("stem_text", stem_text),
+        # ("spellChecker", spellChecker),
+    ]
 
-    test_clean = removeUpper(test_clean)
-    train_clean = removeUpper(train_clean)
-    validation_clean = removeUpper(validation_clean)
+    # Apply only removeNulls to the datasets
+    folder_name = "datasets_removeNulls"
+    test_clean, train_clean, validation_clean = test.copy(), train.copy(), validation.copy()
+    test_clean = removeNulls(test_clean, "test")
+    train_clean = removeNulls(train_clean, "train")
+    validation_clean = removeNulls(validation_clean, "validation")
+    save_datasets(test_clean, train_clean, validation_clean, folder_name)
+
+    # Apply each technique to the datasets
+    num_techniques = len(techniques)
+    for i in range(0, num_techniques):
+        folder_name = "datasets"
+        test_clean, train_clean, validation_clean = test.copy(), train.copy(), validation.copy()
+        
+        # Apply removeNulls before transformations
+        test_clean = removeNulls(test_clean, "test")
+        train_clean = removeNulls(train_clean, "train")
+        validation_clean = removeNulls(validation_clean, "validation")
+        
+        technique_name, technique_func = techniques[i]
+        folder_name += f"_{technique_name}"
+        print(f"Applying technique: {technique_name} on dataset {folder_name}")
+        test_clean = technique_func(test_clean)
+        train_clean = technique_func(train_clean)
+        validation_clean = technique_func(validation_clean)
+        
+        # Apply removeNulls after transformations
+        test_clean = removeNulls(test_clean, "test")
+        train_clean = removeNulls(train_clean, "train")
+        validation_clean = removeNulls(validation_clean, "validation")
+        
+        save_datasets(test_clean, train_clean, validation_clean, folder_name)
+
+
+    # Apply all techniques to the datasets
+    folder_name = "datasets_all"
+    test_clean, train_clean, validation_clean = test.copy(), train.copy(), validation.copy()
     
-    #test_clean = removeStopwords(test_clean)
-    #train_clean = removeStopwords(train_clean)
-    #validation_clean = removeStopwords(validation_clean)
-
-    test_clean = removePonctuation(test_clean) 
-    train_clean = removePonctuation(train_clean)
-    validation_clean = removePonctuation(validation_clean)
-
-    test_clean = removeNumbers(test_clean)
-    train_clean = removeNumbers(train_clean)
-    validation_clean = removeNumbers(validation_clean)
-
-    test_clean = normalizeRepeatedChars(test_clean)
-    train_clean = normalizeRepeatedChars(train_clean)
-    validation_clean = normalizeRepeatedChars(validation_clean)
-
-    test_clean = tokenize_text(test_clean)
-    train_clean = tokenize_text(train_clean)
-    validation_clean = tokenize_text(validation_clean)
-
-    test_clean = lemmatize_text(test_clean)
-    train_clean = lemmatize_text(train_clean)
-    validation_clean = lemmatize_text(validation_clean)
-
-    test_clean = stem_text(test_clean)
-    train_clean = stem_text(train_clean)
-    validation_clean = stem_text(validation_clean)
+    # Apply removeNulls before transformations
+    test_clean = removeNulls(test_clean, "test")
+    train_clean = removeNulls(train_clean, "train")
+    validation_clean = removeNulls(validation_clean, "validation")
     
-    #test_clean = spellChecker(test_clean)
-    #train_clean = spellChecker(train_clean)
-    #validation_clean = spellChecker(validation_clean)
-
-    test_clean = removeNulls(test,"test")
-    train_clean = removeNulls(train,"train")
-    validation_clean = removeNulls(validation,"validation")
+    for technique_name, technique_func in techniques:
+        test_clean = technique_func(test_clean)
+        train_clean = technique_func(train_clean)
+        validation_clean = technique_func(validation_clean)
     
-    test_clean.to_csv("data/test_clean.csv",index=False)
-    train_clean.to_csv("data/train_clean.csv",index=False)
-    validation_clean.to_csv("data/validation_clean.csv",index=False)
-
+    # Apply removeNulls after transformations
+    test_clean = removeNulls(test_clean, "test")
+    train_clean = removeNulls(train_clean, "train")
+    validation_clean = removeNulls(validation_clean, "validation")
     
+    save_datasets(test_clean, train_clean, validation_clean, folder_name)
