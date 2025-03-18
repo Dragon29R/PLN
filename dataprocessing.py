@@ -6,6 +6,13 @@ from spellchecker import SpellChecker
 from nltk.stem import PorterStemmer
 from nltk.corpus import stopwords
 
+def check_for_nan(data):
+    nan_rows = data[data.isna().any(axis=1)]
+    if not nan_rows.empty:
+        print("Rows with NaN values:")
+        print(nan_rows)
+    else:
+        print("No NaN values found.")
 # Remove noise from the dataset
 def removeNulls(df,name):
     df1 = df[df["review_text"].notnull()]
@@ -120,6 +127,9 @@ if __name__ == '__main__':
     #train_clean = spellChecker(train_clean)
     #validation_clean = spellChecker(validation_clean)
 
+    test_clean = removeNulls(test,"test")
+    train_clean = removeNulls(train,"train")
+    validation_clean = removeNulls(validation,"validation")
     
     test_clean.to_csv("data/test_clean.csv",index=False)
     train_clean.to_csv("data/train_clean.csv",index=False)

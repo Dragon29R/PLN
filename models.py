@@ -18,6 +18,8 @@ from catboost import CatBoostClassifier
 from sklearn.model_selection import cross_val_score, KFold
 from skmultilearn.problem_transform import BinaryRelevance
 from sklearn.svm import SVC
+from sklearn.neural_network import MLPClassifier
+import time
 
 
 import pandas as pd
@@ -89,12 +91,15 @@ def optimize_nearest_neighbours(train_x,train_y,test_x,test_y):
 def run_extra_models(datasets,results,columns):
     models = [
     ('XGBoost', XGBClassifier()),
-    ('AdaBoost', AdaBoostClassifier(algorithm='SAMME')),
-    ('Bagging', BaggingClassifier()),
-    ('Gradient Boosting', GradientBoostingClassifier()),
+    ('AdaBoost', AdaBoostClassifier(n_estimators=50,algorithm='SAMME')),
+    ('Bagging', BaggingClassifier(n_estimators=50, n_jobs=-1)),
+    ('Gradient Boosting', GradientBoostingClassifier(n_estimators=50)),
     #('Linear Discriminant Analysis', LinearDiscriminantAnalysis()),
     #('Quadratic Discriminant Analysis', QuadraticDiscriminantAnalysis()),
-    ('CatBoost', CatBoostClassifier(logging_level='Silent'))
+    ('Mlp-adam', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='adam', learning_rate='constant')),
+    ('Mlp-lbfgs', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant')),
+    ('Mlp-sgd', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='sgd', learning_rate='constant')),
+    ('CatBoost', CatBoostClassifier(n_estimators=50,logging_level='Silent'))
 ]   
     kfold = KFold(n_splits=3, random_state=1, shuffle=True)
     for column in columns:
@@ -128,13 +133,16 @@ def multilabel_a_lot_of_models(train_x,train_y,test_x,test_y,results):
         ('SVM', SVC()),
         ('XGBoost', XGBClassifier()),
         ('AdaBoost', AdaBoostClassifier(algorithm='SAMME')),
-        ('Bagging', BaggingClassifier()),
-        ('Gradient Boosting', GradientBoostingClassifier()),
+        ('Bagging', BaggingClassifier( n_jobs=-1)),
+        ('Gradient Boosting', GradientBoostingClassifier(n_estimators=50)),
         #('GaussianNB', GaussianNB()),
-        ('random Forest',RandomForestClassifier(random_state=42)),
+        ('random Forest',RandomForestClassifier()),
         #('Linear Discriminant Analysis', LinearDiscriminantAnalysis()),
         #('Quadratic Discriminant Analysis', QuadraticDiscriminantAnalysis()),
-        ('CatBoost', CatBoostClassifier(logging_level='Silent'))
+        ('Mlp-adam', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='adam', learning_rate='constant')),
+        ('Mlp-lbfgs', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant')),
+        ('Mlp-sgd', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='sgd', learning_rate='constant')),
+        ('CatBoost', CatBoostClassifier(n_estimators=50,logging_level='Silent'))
     ]
     voting = VotingClassifier(estimators=models, voting='soft')
     #staking = StackingClassifier(estimators=models)
@@ -142,10 +150,11 @@ def multilabel_a_lot_of_models(train_x,train_y,test_x,test_y,results):
     #models.append(('Stacking',staking))
     for model_name,model in models:
         print("Running model: ", model_name)
-        if model_name == "GaussianNB":
-            results = predict_multilabel_classifier(train_x.toarray(),train_y,test_x,test_y,results,model,model_name)
-        else:
-            results = predict_multilabel_classifier(train_x,train_y,test_x,test_y,results,model,model_name)
+        time1 = time.time()
+
+        results = predict_multilabel_classifier(train_x,train_y,test_x,test_y,results,model,model_name)
+        time2 = time.time()
+        print("Time: ", time2-time1)
     return results
 
 
@@ -190,6 +199,7 @@ if __name__ == '__main__':
     text_train, text_test = vectorize_data(train, test)
     datasets = generate_balanced_data(text_train,train,columns)
     #results = predict_all_columns(datasets,text_test,optimize_nearest_neighbours,results,columns)
-    #results =run_extra_models(datasets,results,columns)
+    #results_extra =run_extra_models(datasets,results,columns)
+    #results_extra.to_csv("./results/results_extra.csv")
     results = multilabel_a_lot_of_models(text_train,train[columns],text_test,test[columns],results)
-    results.to_csv("results/results.csv")
+    results.to_csv("./results/results.csv")
