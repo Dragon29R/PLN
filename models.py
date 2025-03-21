@@ -97,7 +97,7 @@ def run_extra_models(datasets,results,columns):
     #('Linear Discriminant Analysis', LinearDiscriminantAnalysis()),
     #('Quadratic Discriminant Analysis', QuadraticDiscriminantAnalysis()),
     ('Mlp-adam', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='adam', learning_rate='constant')),
-    ('Mlp-lbfgs', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant')),
+    ('Mlp-lbfgs', MLPClassifier(hidden_layer_sizes=(50,50), max_iter=500,early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant')),
     ('Mlp-sgd', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='sgd', learning_rate='constant')),
     ('CatBoost', CatBoostClassifier(n_estimators=50,logging_level='Silent'))
 ]   
@@ -117,12 +117,14 @@ def run_extra_models(datasets,results,columns):
 def predict_multilabel_classifier(train_x,train_y,test_x,test_y,results,model,model_name):
     br = BinaryRelevance(classifier=model, require_dense=[False, True])
     br.fit(train_x, train_y)
+    print("deg")
     predictions = br.predict(test_x)
     accuracy_score1 = accuracy_score(test_y, predictions)
     f1 = f1_score(test_y, predictions, average='micro')
     recall = recall_score(test_y, predictions, average='micro')
     precision = precision_score(test_y, predictions, average='micro')
     entry = {"MODEL":model_name,"DATASET":"ORIGINAL","ACCURACY":accuracy_score1,"F1":f1,"RECALL":recall,"PRECISION":precision,'TARGET':"All"}
+    print("ResultsMM: ", results)
     results = addToDf(results,entry)
     return results
 def multilabel_a_lot_of_models(train_x,train_y,test_x,test_y,results):
@@ -140,7 +142,7 @@ def multilabel_a_lot_of_models(train_x,train_y,test_x,test_y,results):
         #('Linear Discriminant Analysis', LinearDiscriminantAnalysis()),
         #('Quadratic Discriminant Analysis', QuadraticDiscriminantAnalysis()),
         ('Mlp-adam', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='adam', learning_rate='constant')),
-        ('Mlp-lbfgs', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant')),
+        ('Mlp-lbfgs', MLPClassifier(hidden_layer_sizes=(50,50), max_iter=500,early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant')),
         ('Mlp-sgd', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='sgd', learning_rate='constant')),
         ('CatBoost', CatBoostClassifier(n_estimators=50,logging_level='Silent'))
     ]
@@ -155,6 +157,7 @@ def multilabel_a_lot_of_models(train_x,train_y,test_x,test_y,results):
         results = predict_multilabel_classifier(train_x,train_y,test_x,test_y,results,model,model_name)
         time2 = time.time()
         print("Time: ", time2-time1)
+        print("Results multilabel: ", results)
     return results
 
 
@@ -192,9 +195,9 @@ if __name__ == '__main__':
     results = generateDf(columns)
     #load the datasets and clean it
     print("runing dataAnalyse.py")
-    test = pd.read_csv("data/test_clean.csv")
-    train = pd.read_csv("data/train_clean.csv")
-    validation = pd.read_csv("data/validation_clean.csv")
+    test = pd.read_csv("data/datasets_all/test_clean.csv")
+    train = pd.read_csv("data/datasets_all/train_clean.csv")
+    validation = pd.read_csv("data/datasets_all/validation_clean.csv")
     #vectorize the review strings
     text_train, text_test = vectorize_data(train, test)
     datasets = generate_balanced_data(text_train,train,columns)
@@ -202,4 +205,5 @@ if __name__ == '__main__':
     #results_extra =run_extra_models(datasets,results,columns)
     #results_extra.to_csv("./results/results_extra.csv")
     results = multilabel_a_lot_of_models(text_train,train[columns],text_test,test[columns],results)
+    print("Results: ", results)
     results.to_csv("./results/results.csv")

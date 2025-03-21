@@ -38,9 +38,9 @@ def plot_wordclouds(df):
 if __name__ == '__main__':
     #load the datasets and clean it
     print("runing dataAnalyse.py")
-    test_clean = pd.read_csv("data/test_clean.csv")
-    train_clean = pd.read_csv("data/train_clean.csv")
-    validation_clean = pd.read_csv("data/validation_clean.csv")
+    test_clean = pd.read_csv("data/datasets_all/test_clean.csv")
+    train_clean = pd.read_csv("data/datasets_all/train_clean.csv")
+    validation_clean = pd.read_csv("data/datasets_all/validation_clean.csv")
 
     #plot some analysis
     plot_boxplot(train_clean,"train")
