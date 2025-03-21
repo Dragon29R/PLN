@@ -7,8 +7,8 @@ from nltk.stem import PorterStemmer
 from nltk.corpus import stopwords
 import os
 
-"""
-to convert parquet to csv
+
+#to convert parquet to csv
 
 df_train = pd.read_parquet("data/train.parquet")
 df_val = pd.read_parquet("data/validation.parquet")
@@ -17,7 +17,7 @@ df_test = pd.read_parquet("data/test.parquet")
 df_test.to_csv("data/test.csv", index=False)
 df_train.to_csv("data/train.csv", index=False)
 df_val.to_csv("data/validation.csv", index=False)
-"""
+
 def check_for_nan(data):
     nan_rows = data[data.isna().any(axis=1)]
     if not nan_rows.empty:
