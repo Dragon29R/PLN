@@ -146,7 +146,8 @@ def multilabel_a_lot_of_models(train_x,train_y,test_x,test_y,results):
         ('Mlp-sgd', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='sgd', learning_rate='constant')),
         ('CatBoost', CatBoostClassifier(n_estimators=50,logging_level='Silent'))
     ]
-    voting = VotingClassifier(estimators=models, voting='soft')
+    voting_estimators = [(name, model) for name, model in models]
+    voting = VotingClassifier(estimators=voting_estimators, voting='soft')
     #staking = StackingClassifier(estimators=models)
     models.append(('Voting',voting))
     #models.append(('Stacking',staking))
