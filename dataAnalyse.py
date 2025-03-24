@@ -4,14 +4,30 @@ import nltk
 from nltk.stem.snowball import SnowballStemmer
 import pandas as pd
 from dataprocessing import generate_corpus
+import os
 
+
+
+# Create directories if they do not exist
+def create_directories():
+    os.makedirs("plots/boxplots", exist_ok=True)
+    os.makedirs("plots/wordclouds", exist_ok=True)
 
 # Plot boxplot of the review_text length
 def plot_boxplot(data,legend):
     sizes = [len(i) for i in data["review_text"]]
     max1 = data[data["review_text"].str.len()==max(sizes)]
+    plt.figure()
     plt.boxplot(sizes)
     plt.title(legend)
+    plt.ylabel("Review length")
+    # Create legend without handles
+    legend_texts = [
+    "Max review length: " + str(max1["review_text"].str.len().values[0]),
+    "Average review length: " + str(sum(sizes)/len(sizes))
+]
+    plt.legend(legend_texts)
+
     plt.savefig("plots/boxplots/"+legend+"_boxplot.png")
 
 # Generate the wordcloud
@@ -36,6 +52,7 @@ def plot_wordclouds(df):
         generateWordCloud(corpus,tag)
 
 if __name__ == '__main__':
+    create_directories()
     #load the datasets and clean it
     print("runing dataAnalyse.py")
     test_clean = pd.read_csv("data/datasets_all/test_clean.csv")
@@ -43,8 +60,8 @@ if __name__ == '__main__':
     validation_clean = pd.read_csv("data/datasets_all/validation_clean.csv")
 
     #plot some analysis
-    plot_boxplot(train_clean,"train")
-    plot_boxplot(test_clean,"test")
-    plot_boxplot(validation_clean,"validation")
+    plot_boxplot(train_clean,"train dataset")
+    plot_boxplot(test_clean,"test dataset")
+    plot_boxplot(validation_clean,"validation dataset")
     #draw wordclouds
     plot_wordclouds(train_clean)
