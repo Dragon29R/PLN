@@ -2,7 +2,7 @@ import nltk
 import pandas as pd
 import re
 import string
-from spellchecker import SpellChecker
+#from spellchecker import SpellChecker
 from nltk.stem import PorterStemmer
 from nltk.corpus import stopwords
 import os
@@ -10,13 +10,21 @@ import os
 
 #to convert parquet to csv
 
-df_train = pd.read_parquet("data/train.parquet")
-df_val = pd.read_parquet("data/validation.parquet")
-df_test = pd.read_parquet("data/test.parquet")
+splits = {'train': 'data/train-00000-of-00001.parquet', 'validation': 'data/validation-00000-of-00001.parquet', 'test': 'data/test-00000-of-00001.parquet'}
+if not os.path.exists("data"):
+    os.makedirs("data")
+    # Download the dataset and convert it to df
+    df_train = pd.read_parquet("hf://datasets/higopires/RePro-categories-multilabel/" + splits["train"])
+    df_val = pd.read_parquet("hf://datasets/higopires/RePro-categories-multilabel/" + splits["validation"])
+    df_test = pd.read_parquet("hf://datasets/higopires/RePro-categories-multilabel/" + splits["test"])
 
-df_test.to_csv("data/test.csv", index=False)
-df_train.to_csv("data/train.csv", index=False)
-df_val.to_csv("data/validation.csv", index=False)
+    df_test.to_csv("data/test.csv", index=False)
+    df_train.to_csv("data/train.csv", index=False)
+    df_val.to_csv("data/validation.csv", index=False)
+else:
+    df_train = pd.read_csv("data/train.csv")
+    df_val = pd.read_csv("data/validation.csv")
+    df_test = pd.read_csv("data/test.csv")
 
 def check_for_nan(data):
     nan_rows = data[data.isna().any(axis=1)]
