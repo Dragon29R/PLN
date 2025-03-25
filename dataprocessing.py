@@ -7,7 +7,7 @@ from nltk.stem import PorterStemmer
 from nltk.corpus import stopwords
 import os
 
-
+#nltk.download('wordnet')
 #to convert parquet to csv
 
 splits = {'train': 'data/train-00000-of-00001.parquet', 'validation': 'data/validation-00000-of-00001.parquet', 'test': 'data/test-00000-of-00001.parquet'}

@@ -13,12 +13,40 @@ from xgboost import XGBClassifier
 from catboost import CatBoostClassifier
 from sklearn.model_selection import cross_val_score, KFold
 from skmultilearn.problem_transform import BinaryRelevance
+from sklearn.multioutput import ClassifierChain
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
 import time
 
 
 import pandas as pd
+
+#Globals
+columns =["ENTREGA","OUTROS","PRODUTO","CONDICOESDERECEBIMENTO","ANUNCIO"]
+
+models = [
+    ('KNN', KNeighborsClassifier()),
+    #('Radius Neighbors', RadiusNeighborsClassifier()),
+    ('Decision Tree', DecisionTreeClassifier()),
+    ('SVM', SVC(probability=True)),
+    ('XGBoost', XGBClassifier()),
+    ('AdaBoost', AdaBoostClassifier(algorithm='SAMME')),
+    ('Bagging', BaggingClassifier( n_jobs=-1)),
+    ('Gradient Boosting', GradientBoostingClassifier(n_estimators=50)),
+    #('GaussianNB', GaussianNB()),
+    ('random Forest',RandomForestClassifier()),
+    #('Linear Discriminant Analysis', LinearDiscriminantAnalysis()),
+    #('Quadratic Discriminant Analysis', QuadraticDiscriminantAnalysis()),
+    ('Mlp-adam', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='adam', learning_rate='constant')),
+    ('Mlp-lbfgs', MLPClassifier(hidden_layer_sizes=(50,50), max_iter=500,early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant')),
+    ('Mlp-sgd', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='sgd', learning_rate='constant')),
+    ('CatBoost', CatBoostClassifier(n_estimators=50,logging_level='Silent'))
+    ]
+
+voting_estimators = [(name, model) for name, model in models]
+voting = VotingClassifier(estimators=voting_estimators, voting='soft')
+#staking = StackingClassifier(estimators=models)
+models.append(('Voting',voting))
 
 # dataset balancing
 
@@ -85,7 +113,7 @@ def optimize_nearest_neighbours(train_x,train_y,test_x,test_y):
     return best_score, best_n , best_stats
 
 #run a lot of models
-def run_extra_models(datasets,validation_x,validation_y,results,columns,dataset_type="ORIGINAL"):
+def run_extra_models(datasets,validation_x,validation_y,results,columns,dataset_type):
     models = [
         ('KNN', KNeighborsClassifier()),
         #('Radius Neighbors', RadiusNeighborsClassifier()),
@@ -103,15 +131,20 @@ def run_extra_models(datasets,validation_x,validation_y,results,columns,dataset_
         ('Mlp-lbfgs', MLPClassifier(hidden_layer_sizes=(50,50), max_iter=500,early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant')),
         ('Mlp-sgd', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='sgd', learning_rate='constant')),
         ('CatBoost', CatBoostClassifier(n_estimators=50,logging_level='Silent'))
-]   
+    ]
+    
+    voting_estimators = [(name, model) for name, model in models]
+    voting = VotingClassifier(estimators=voting_estimators, voting='soft')
+    #staking = StackingClassifier(estimators=models)
+    models.append(('Voting',voting))
     for column in columns:
         dataset = datasets[column]
-        print("Dataset: ", dataset)
         for sampling,dataset in dataset.items():
             train_x,train_y = dataset
             print("Running models for column: ", column)
+            time1 = time.time()
             for name, model in models:
-                print("Running model: ", name)
+                #print("Running model: ", name)
                 model.fit(train_x,train_y)
                 predictions = model.predict(validation_x)
                 accuracy_score1 = accuracy_score(validation_y[column], predictions)
@@ -121,9 +154,12 @@ def run_extra_models(datasets,validation_x,validation_y,results,columns,dataset_
                 hamming_loss1 = hamming_loss(validation_y[column], predictions)
                 entry = {"MODEL":model.__class__.__name__,"DATASET":dataset_type,"Sampling":sampling,"ACCURACY":accuracy_score1,"F1":f1,"RECALL":recall,"PRECISION":precision,"HAMMING_LOSS":hamming_loss1,'TARGET':column}
                 results = addToDf(results,entry)
+            time2 = time.time()
+            delta = time2-time1
+            print("Time: ", time.strftime("%H:%M:%S", time.gmtime(delta)))
     return results
 #predict using multilabel classifier
-def predict_multilabel_classifier(train_x,train_y,test_x,test_y,results,model,model_name):
+def predict_multilabel_classifier(train_x,train_y,test_x,test_y,results,model,model_name,dataset_name,sampling):
     br = BinaryRelevance(classifier=model, require_dense=[False, True])
     br.fit(train_x, train_y)
     predictions = br.predict(test_x)
@@ -132,17 +168,15 @@ def predict_multilabel_classifier(train_x,train_y,test_x,test_y,results,model,mo
     recall = recall_score(test_y, predictions, average='micro')
     precision = precision_score(test_y, predictions, average='micro')
     hamming_loss1 = hamming_loss(test_y, predictions)
-    entry = {"MODEL":model_name,"DATASET":"ORIGINAL","ACCURACY":accuracy_score1,"F1":f1,"RECALL":recall,"PRECISION":precision,"HAMMING_LOSS":hamming_loss1,'TARGET':"All"}
+    entry = {"MODEL":model_name,"DATASET":dataset_name,"SAMPLING":sampling,"ACCURACY":accuracy_score1,"F1":f1,"RECALL":recall,"PRECISION":precision,"HAMMING_LOSS":hamming_loss1,'TARGET':"All"}
     print("ResultsMM: ", results)
     results = addToDf(results,entry)
     return results
-def multilabel_a_lot_of_models(train_x,train_y,test_x,test_y,results):
+def multilabel_a_lot_of_models(train_x,train_y,validation_x,validation_y,results,dataset_name):
     models = [
         ('KNN', KNeighborsClassifier()),
         #('Radius Neighbors', RadiusNeighborsClassifier()),
         ('Decision Tree', DecisionTreeClassifier()),
-    ]
-    """
         ('SVM', SVC(probability=True)),
         ('XGBoost', XGBClassifier()),
         ('AdaBoost', AdaBoostClassifier(algorithm='SAMME')),
@@ -155,23 +189,68 @@ def multilabel_a_lot_of_models(train_x,train_y,test_x,test_y,results):
         ('Mlp-adam', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='adam', learning_rate='constant')),
         ('Mlp-lbfgs', MLPClassifier(hidden_layer_sizes=(50,50), max_iter=500,early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant')),
         ('Mlp-sgd', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='sgd', learning_rate='constant')),
-        ('CatBoost', CatBoostClassifier(n_estimators=50,logging_level='Silent'))"""
-    """
+        ('CatBoost', CatBoostClassifier(n_estimators=50,logging_level='Silent'))
+    ]
+    
     voting_estimators = [(name, model) for name, model in models]
     voting = VotingClassifier(estimators=voting_estimators, voting='soft')
     #staking = StackingClassifier(estimators=models)
-    models.append(('Voting',voting))"""
+    models.append(('Voting',voting))
     #models.append(('Stacking',staking))
     for model_name,model in models:
         print("Running model: ", model_name)
         time1 = time.time()
-
-        results = predict_multilabel_classifier(train_x,train_y,test_x,test_y,results,model,model_name)
+        results = predict_multilabel_classifier(train_x,train_y,validation_x,validation_y,results,model,model_name,"ORIGINAL",dataset_name)
         time2 = time.time()
-        print("Time: ", time2-time1)
+        delta = time2-time1
+        print("Time: ", time.strftime("%H:%M:%S", time.gmtime(delta)))
         print("Results multilabel: ", results)
     return results
 
+def runModel(sampling,datasetType,models):
+    test = pd.read_csv("data/"+datasetType+"/test_clean.csv")
+    train = pd.read_csv("data/"+datasetType+"/train_clean.csv")
+    validation = pd.read_csv("data/"+datasetType+"/validation_clean.csv")
+    text_train,text_validate, text_test = vectorize_data(train, validation,test)
+    datasets = generate_balanced_data(text_train,train,columns)
+    datasets = {column:datasets[column][sampling] for column in columns}
+
+#Get Best Models
+    models1 = {
+        'KNN': KNeighborsClassifier(),
+        'Decision Tree': DecisionTreeClassifier(),
+        'SVM': SVC(probability=True),
+        'XGBoost': XGBClassifier(),
+        'AdaBoost': AdaBoostClassifier(algorithm='SAMME'),
+        'Bagging': BaggingClassifier( n_jobs=-1),
+        'Gradient Boosting': GradientBoostingClassifier(n_estimators=50),
+        #('GaussianNB', GaussianNB()),
+        'random Forest':RandomForestClassifier(),
+        #('Linear Discriminant Analysis', LinearDiscriminantAnalysis()),
+        #('Quadratic Discriminant Analysis', QuadraticDiscriminantAnalysis()),
+        'Mlp-adam': MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='adam', learning_rate='constant'),
+        'Mlp-lbfgs': MLPClassifier(hidden_layer_sizes=(50,50), max_iter=500,early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant'),
+        'Mlp-sgd': MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='sgd', learning_rate='constant'),
+        'CatBoost': CatBoostClassifier(n_estimators=50,logging_level='Silent')
+    }
+    # Create and fit separate chains
+    chains = []
+    for column, model in models:
+        x_train, y_train = datasets[column]
+        chain = ClassifierChain(model, order='random', random_state=42)
+        chain.fit(x_train, y_train)  # Fit on single label
+        chains.append(chain)
+
+
+    # Make predictions
+    predictions = np.column_stack([chain.predict(text_test) for chain in chains])
+    # Evaluate
+    accuracy = accuracy_score(test[columns], predictions)
+    f1 = f1_score(test[columns], predictions, average='micro')
+    recall = recall_score(test[columns], predictions, average='micro')
+    precision = precision_score(test[columns], predictions, average='micro')
+    hamming_loss1 = hamming_loss(test[columns], predictions)
+    print(f"Accuracy: {accuracy}, F1: {f1}, Recall: {recall}, Precision: {precision}, Hamming Loss: {hamming_loss1}")
 
 
 #single labeling for each column in singular
@@ -202,6 +281,7 @@ def generateDf(columns):
         results["TARGET"] = pd.Categorical([], categories=columns)
         results["Sampling"] = pd.Categorical([], categories=["UNDERSAMPLING", "OVERSAMPLING", "ORIGINAL"])
         return results
+
 if __name__ == '__main__':
     columns =["ENTREGA","OUTROS","PRODUTO","CONDICOESDERECEBIMENTO","ANUNCIO"]
     datasetsTypes = ["datasets_all","datasets_lemmatize_text","datasets_normalizeRepeatedChars",
@@ -212,7 +292,7 @@ if __name__ == '__main__':
     print("runing dataAnalyse.py")
     for datasetType in datasetsTypes:
         print("Running dataset: ", datasetType)
-        clk = time.time()
+        time1 = time.time()
         test = pd.read_csv("data/"+datasetType+"/test_clean.csv")
         train = pd.read_csv("data/"+datasetType+"/train_clean.csv")
         validation = pd.read_csv("data/"+datasetType+"/validation_clean.csv")
@@ -220,10 +300,12 @@ if __name__ == '__main__':
         text_train,text_validate, text_test = vectorize_data(train, validation,test)
         datasets = generate_balanced_data(text_train,train,columns)
         #results = predict_all_columns(datasets,text_test,optimize_nearest_neighbours,results,columns)
-        #results_extra =run_extra_models(datasets,text_validate,validation[columns],results,columns)
-        results = multilabel_a_lot_of_models(text_train,train[columns],text_validate,validation[columns],results)
-        clck2 = time.time()
-        print("time Elapsed: ", str(clck2-clk//60)+":"+str((clck2-clk)%60) )
+        #results =run_extra_models(datasets,text_validate,validation[columns],results,columns,datasetType)
+        results = multilabel_a_lot_of_models(text_train,train[columns],text_validate,validation[columns],results,datasetType)
+        time2 = time.time()
+        delta = time2-time1
+        print(datasetType+" TimeElapsed: ", time.strftime("%H:%M:%S", time.gmtime(delta)))
+        results.to_csv("./results/results_all.csv")
     #results_extra.to_csv("./results/results_extra.csv")
     print("Results: ", results)
     if not os.path.exists("results"):
