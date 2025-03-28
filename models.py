@@ -1,8 +1,9 @@
 import numpy as np
 import os
+import copy
 from sklearn.neighbors import KNeighborsClassifier, RadiusNeighborsClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics import accuracy_score,hamming_loss,recall_score,f1_score,precision_score,roc_curve, RocCurveDisplay
+from sklearn.metrics import accuracy_score,hamming_loss,recall_score,f1_score,precision_score,roc_curve, RocCurveDisplay,jaccard_score
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 from sklearn.tree import DecisionTreeClassifier
@@ -152,7 +153,7 @@ def run_extra_models(datasets,validation_x,validation_y,results,columns,dataset_
                 recall = recall_score(validation_y[column], predictions, average='micro')
                 precision = precision_score(validation_y[column], predictions, average='micro')
                 hamming_loss1 = hamming_loss(validation_y[column], predictions)
-                entry = {"MODEL":model.__class__.__name__,"DATASET":dataset_type,"Sampling":sampling,"ACCURACY":accuracy_score1,"F1":f1,"RECALL":recall,"PRECISION":precision,"HAMMING_LOSS":hamming_loss1,'TARGET':column}
+                entry = {"MODEL":name,"DATASET":dataset_type,"Sampling":sampling,"ACCURACY":accuracy_score1,"F1":f1,"RECALL":recall,"PRECISION":precision,"HAMMING_LOSS":hamming_loss1,'TARGET':column}
                 results = addToDf(results,entry)
             time2 = time.time()
             delta = time2-time1
@@ -207,7 +208,11 @@ def multilabel_a_lot_of_models(train_x,train_y,validation_x,validation_y,results
         print("Results multilabel: ", results)
     return results
 
-def runModel(sampling,datasetType,models):
+def runClassifierChain(sampling,datasetType,modelsList):
+    if os.path.exists("results/results_classifierChain.csv"):
+        results = pd.read_csv("results/results_classifierChain.csv")
+    else:
+        results =generateDf(columns)
     test = pd.read_csv("data/"+datasetType+"/test_clean.csv")
     train = pd.read_csv("data/"+datasetType+"/train_clean.csv")
     validation = pd.read_csv("data/"+datasetType+"/validation_clean.csv")
@@ -217,40 +222,65 @@ def runModel(sampling,datasetType,models):
 
 #Get Best Models
     models1 = {
-        'KNN': KNeighborsClassifier(),
-        'Decision Tree': DecisionTreeClassifier(),
-        'SVM': SVC(probability=True),
-        'XGBoost': XGBClassifier(),
-        'AdaBoost': AdaBoostClassifier(algorithm='SAMME'),
-        'Bagging': BaggingClassifier( n_jobs=-1),
-        'Gradient Boosting': GradientBoostingClassifier(n_estimators=50),
+        'KNeighborsClassifier': KNeighborsClassifier(),
+        'DecisionTreeClassifier': DecisionTreeClassifier(),
+       'SVC': SVC(probability=True),
+        'XGBClassifier': XGBClassifier(),
+        'AdaBoostClassifier': AdaBoostClassifier(algorithm='SAMME'),
+        'BaggingClassifier': BaggingClassifier( n_jobs=-1),
+        'GradientBoostingClassifier': GradientBoostingClassifier(n_estimators=50),
         #('GaussianNB', GaussianNB()),
-        'random Forest':RandomForestClassifier(),
+        'RandomForestClassifier':RandomForestClassifier(),
         #('Linear Discriminant Analysis', LinearDiscriminantAnalysis()),
         #('Quadratic Discriminant Analysis', QuadraticDiscriminantAnalysis()),
-        'Mlp-adam': MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='adam', learning_rate='constant'),
-        'Mlp-lbfgs': MLPClassifier(hidden_layer_sizes=(50,50), max_iter=500,early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant'),
-        'Mlp-sgd': MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='sgd', learning_rate='constant'),
-        'CatBoost': CatBoostClassifier(n_estimators=50,logging_level='Silent')
+        'MLPClassifier': MLPClassifier(hidden_layer_sizes=(50,50), max_iter=500,early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant'),
+        'CatBoostClassifier': CatBoostClassifier(n_estimators=50,logging_level='Silent'),
+        'VotingClassifier': VotingClassifier(estimators=[(name, model) for name, model in models], voting='soft')
     }
     # Create and fit separate chains
+    print("Running model: ", modelsList)
+    # train the models individually
+    listModels = []
+    for i,modelname in enumerate(modelsList):
+        model =copy.deepcopy( models1[modelname])
+        column = columns[i]
+        train_x,train_y = datasets[column]
+        model.fit(train_x, train_y)  # Fit on single label
+        listModels.append(model)
+        print("Training model: ", model.__class__.__name__)
+
     chains = []
-    for column, model in models:
-        x_train, y_train = datasets[column]
+    for i,modelname in enumerate(modelsList):
+        column = columns[i]
+        model =listModels[i]
+        print("Running model: ", model.__class__.__name__, " for column: ", column)
+        train_x,train_y = text_train , train[columns]
         chain = ClassifierChain(model, order='random', random_state=42)
-        chain.fit(x_train, y_train)  # Fit on single label
+        chain.fit(train_x, train_y)  # Fit on single label
         chains.append(chain)
 
 
     # Make predictions
-    predictions = np.column_stack([chain.predict(text_test) for chain in chains])
+    predictions = np.array([chain.predict(text_test) for chain in
+                          chains])
+    Y_pred_ensemble = predictions.mean(axis=0)
+    ensemble_jaccard_score = jaccard_score(
+    test[columns], Y_pred_ensemble >= 0.5, average="samples"
+)
+    print("Ensemble Jaccard score", ensemble_jaccard_score)
+    average = precision_score(test[columns], Y_pred_ensemble >= 0.5, average="samples")
+    f1_score1 = f1_score(test[columns], Y_pred_ensemble >= 0.5, average="samples")
+    recall = recall_score(test[columns], Y_pred_ensemble >= 0.5, average="samples")
+    accuracy = accuracy_score(test[columns], Y_pred_ensemble >= 0.5)
+    entry = {"MODEL":modelsList,"DATASET":datasetType,"PRECISION":average, "ACCURACY":accuracy,"F1":f1_score1,"RECALL":recall,"MODEL_PARAMS":'','TARGET':"All"}
+    results = addToDf(results,entry)
+    results.to_csv("results/results_classifierChain.csv")
+    print("Results: ", entry)
     # Evaluate
-    accuracy = accuracy_score(test[columns], predictions)
-    f1 = f1_score(test[columns], predictions, average='micro')
-    recall = recall_score(test[columns], predictions, average='micro')
-    precision = precision_score(test[columns], predictions, average='micro')
-    hamming_loss1 = hamming_loss(test[columns], predictions)
-    print(f"Accuracy: {accuracy}, F1: {f1}, Recall: {recall}, Precision: {precision}, Hamming Loss: {hamming_loss1}")
+    """chain_jaccard_scores = [
+        jaccard_score(test[columns], Y_pred_chain >= 0.5, average="samples")
+        for Y_pred_chain in predictions
+    ]"""
 
 
 #single labeling for each column in singular

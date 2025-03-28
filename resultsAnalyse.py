@@ -3,12 +3,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 import shutil
-from models import runModel,columns
+from models import  runClassifierChain,columns,predict_multilabel_classifier,runClassifierChain
 
 def plot_orderedBy(metric,ascending=False):
     columns =["ENTREGA","OUTROS","PRODUTO","CONDICOESDERECEBIMENTO","ANUNCIO"]
     print("Results for metric: ", metric)
-    results = pd.read_csv("results/results.csv")
+    results = pd.read_csv("ResultsArchive/results.csv")
     for column in columns:
         print("Results for column: ", column)
         # Plot the bar graph using seaborn
@@ -33,7 +33,7 @@ def plot_BestModel_orderedBy(metric,ascending=False):
     os.makedirs("plots/BestModel/"+metric)
     columns =["ENTREGA","OUTROS","PRODUTO","CONDICOESDERECEBIMENTO","ANUNCIO"]
     print("Results for metric: ", metric)
-    results = pd.read_csv("results/results.csv")
+    results = pd.read_csv("ResultsArchive/results.csv")
     for column in columns:
         print("Results for column: ", column)
         # Plot the bar graph using seaborn
@@ -56,7 +56,7 @@ def plot_BestModel_orderedBy(metric,ascending=False):
         plt.savefig(f"plots/BestModel/{metric}/{column}.png")
 
 def best_models(metric,topK,ascending=False):
-    results = pd.read_csv("results/results.csv")
+    results = pd.read_csv("ResultsArchive/results.csv")
     # Step 1: Get top k models per target
     top_models_per_target = (
         results.groupby("TARGET", group_keys=False)
@@ -73,7 +73,7 @@ def best_models(metric,topK,ascending=False):
     common_models = set.intersection(*unique_models_per_target)
     print("\n\nCommon models for all targets:", list(common_models))
 def best_performing_datasets(metric,topK,ascending=False):
-    results = pd.read_csv("results/results.csv")
+    results = pd.read_csv("ResultsArchive/results.csv")
     # Step 1: Get top k models per target
     top_models_per_target = (
         results.groupby("TARGET", group_keys=False)
@@ -91,10 +91,13 @@ def best_performing_datasets(metric,topK,ascending=False):
     common_datasets = set.intersection(*unique_models_per_target)
     print("\n\nCommon datasets for all targets:", list(common_datasets))
 def getBestModelByTarget(metric,ascending=False):
-    results = pd.read_csv("results/results.csv")
+    results = pd.read_csv("ResultsArchive/results.csv")
+    return1 = []
     for target in columns:
-        top_models = results[results["TARGET"]==target].sort_values(by=metric,ascending=ascending).drop_duplicates("MODEL").head(1)
-        print(f"Best model for {target} is {top_models['MODEL'].values[0]} with {metric} = {top_models[metric].values[0]}")
+        top_models = results[(results["TARGET"]==target) & (results["MODEL"] != "VotingClassifier")].sort_values(by=metric,ascending=ascending).drop_duplicates("MODEL").head(1)
+        #print(f"Best model for {target} is {top_models['MODEL'].values[0]} with {metric} = {top_models[metric].values[0]}")
+        return1.append(top_models['MODEL'].values[0])
+    return return1
     
 
 
@@ -107,8 +110,8 @@ if __name__ == '__main__':
     if os.path.exists("plots"):
         shutil.rmtree("plots")
     os.makedirs("plots")
-    models = getBestModelByTarget("ACCURACY",ascending=False)
-    #runModel("OVERSAMPLING","datasets_stem_text","test")
+    models = getBestModelByTarget("F1",ascending=False)
+    runClassifierChain("OVERSAMPLING","datasets_stem_text",models)
     """plot_BestModel_orderedBy("ACCURACY",ascending=False)
     plot_orderedBy("ACCURACY",ascending=False)
     plot_orderedBy("F1",ascending=False)
