@@ -5,10 +5,9 @@ import os
 import shutil
 from models import  runClassifierChain,columns,predict_multilabel_classifier,runClassifierChain
 
-def plot_orderedBy(metric,ascending=False):
+def plot_orderedBy(results,metric,ascending=False):
     columns =["ENTREGA","OUTROS","PRODUTO","CONDICOESDERECEBIMENTO","ANUNCIO"]
     print("Results for metric: ", metric)
-    results = pd.read_csv("ResultsArchive/results.csv")
     for column in columns:
         print("Results for column: ", column)
         # Plot the bar graph using seaborn
@@ -28,12 +27,21 @@ def plot_orderedBy(metric,ascending=False):
         plt.ylabel('VARIABLE')
         plt.title(f'Top {k} {metric} for {column}')
         plt.show()
-def plot_BestModel_orderedBy(metric,ascending=False):
-    os.makedirs("plots/BestModel")
+def mergeResults():
+    df1 = pd.read_csv("ResultsArchive/results.csv")
+    df1 = df1.rename(columns={'Sampling':'SAMPLING'})
+    df2= pd.read_csv("ResultsArchive/results_all.csv")
+    print("df1 columns:", df1.columns.tolist())
+    print("df2 columns:", df2.columns.tolist())
+    merged_df = pd.merge(df1, df2, how='outer', indicator=True)
+    merged_df.to_csv("ResultsArchive/merged_results.csv", index=False)
+
+def plot_BestModel_orderedBy(results,metric,ascending=False):
+    os.makedirs("plots/BestModel",exist_ok=True)
     os.makedirs("plots/BestModel/"+metric)
     columns =["ENTREGA","OUTROS","PRODUTO","CONDICOESDERECEBIMENTO","ANUNCIO"]
     print("Results for metric: ", metric)
-    results = pd.read_csv("ResultsArchive/results.csv")
+
     for column in columns:
         print("Results for column: ", column)
         # Plot the bar graph using seaborn
@@ -110,11 +118,17 @@ if __name__ == '__main__':
     if os.path.exists("plots"):
         shutil.rmtree("plots")
     os.makedirs("plots")
-    models = getBestModelByTarget("F1",ascending=False)
-    runClassifierChain("OVERSAMPLING","datasets_stem_text",models)
-    """plot_BestModel_orderedBy("ACCURACY",ascending=False)
-    plot_orderedBy("ACCURACY",ascending=False)
-    plot_orderedBy("F1",ascending=False)
-    plot_orderedBy("RECALL",ascending=False)
-    plot_orderedBy("PRECISION",ascending=False)
-    plot_orderedBy("HAMMING_LOSS",ascending=True)"""
+    #mergeResults()
+    #models = getBestModelByTarget("F1",ascending=False)
+    #runClassifierChain("OVERSAMPLING","datasets_stem_text",models)
+    results = pd.read_csv("ResultsArchive/results.csv")
+    plot_BestModel_orderedBy(results,"ACCURACY",ascending=False)
+    plot_BestModel_orderedBy(results,"F1",ascending=False)
+    plot_BestModel_orderedBy(results,"RECALL",ascending=False)
+    plot_BestModel_orderedBy(results,"PRECISION",ascending=False)
+    plot_BestModel_orderedBy(results,"HAMMING_LOSS",ascending=True)
+    """plot_orderedBy(results,"ACCURACY",ascending=False)
+    plot_orderedBy(results,"F1",ascending=False)
+    plot_orderedBy(results,"RECALL",ascending=False)
+    plot_orderedBy(results,"PRECISION",ascending=False)
+    plot_orderedBy(results,"HAMMING_LOSS",ascending=True)"""
