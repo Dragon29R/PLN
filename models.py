@@ -123,45 +123,26 @@ def optimize_nearest_neighbours(train_x,train_y,test_x,test_y):
 
 
 #run all the models for each column to try to find which one works best for each column using each dataset
-    """
-    Runs all the models for each column to try to find which one works best for each column using each dataset.
-
-    Parameters
-    ----------
-    datasets : dict
-        A dictionary where the key is the column name and the value is a dictionary with the different sampling methods.
-    validation_x : array
-        The validation data.
-    validation_y : array
-        The validation labels.
-    results : DataFrame
-        The DataFrame where the results will be stored.
-    columns : list
-        The list of columns to consider.
-    dataset_type : str
-        The type of dataset (e.g. "stem_text").
-
-    Returns
-    -------
-    results : DataFrame
-        The DataFrame with the results.
-    """
 def run_extra_models(datasets,validation_x,validation_y,results,columns,dataset_type):
     for column in columns:
         dataset = datasets[column]
         for sampling,dataset in dataset.items():
+            # get the training data from the dataset
             train_x,train_y = dataset
             print("Running models for column: ", column)
             time1 = time.time()
             for name, model in models:
                 #print("Running model: ", name)
+                #train the model
                 model.fit(train_x,train_y)
                 predictions = model.predict(validation_x)
+                #evaluate the model
                 accuracy_score1 = accuracy_score(validation_y[column], predictions)
                 f1 = f1_score(validation_y[column], predictions, average='micro')
                 recall = recall_score(validation_y[column], predictions, average='micro')
                 precision = precision_score(validation_y[column], predictions, average='micro')
                 hamming_loss1 = hamming_loss(validation_y[column], predictions)
+                #create the entry for the dataframe
                 entry = {"MODEL":name,"DATASET":dataset_type,"Sampling":sampling,"ACCURACY":accuracy_score1,"F1":f1,"RECALL":recall,"PRECISION":precision,"HAMMING_LOSS":hamming_loss1,'TARGET':column}
                 results = addToDf(results,entry)
             time2 = time.time()
@@ -170,14 +151,18 @@ def run_extra_models(datasets,validation_x,validation_y,results,columns,dataset_
     return results
 #predict using Binaryrelevance to predict multilabel using only one model for all the targets
 def predict_multilabel_classifier(train_x,train_y,test_x,test_y,results,model,model_name,dataset_name,sampling):
+    # create the model using binary relevance
     br = BinaryRelevance(classifier=model, require_dense=[False, True])
+    # fit the model to the training data
     br.fit(train_x, train_y)
+    # evaluate the model on the test data
     predictions = br.predict(test_x)
     accuracy_score1 = accuracy_score(test_y, predictions)
     f1 = f1_score(test_y, predictions, average='micro')
     recall = recall_score(test_y, predictions, average='micro')
     precision = precision_score(test_y, predictions, average='micro')
     hamming_loss1 = hamming_loss(test_y, predictions)
+    # create the entry for the dataframe
     entry = {"MODEL":model_name,"DATASET":dataset_name,"SAMPLING":sampling,"ACCURACY":accuracy_score1,"F1":f1,"RECALL":recall,"PRECISION":precision,"HAMMING_LOSS":hamming_loss1,'TARGET':"All"}
     print("ResultsMM: ", results)
     results = addToDf(results,entry)
@@ -188,6 +173,7 @@ def multilabel_a_lot_of_models(train_x,train_y,validation_x,validation_y,results
     for model_name,model in models:
         print("Running model: ", model_name)
         time1 = time.time()
+        # run the multilabel classifier for each model
         results = predict_multilabel_classifier(train_x,train_y,validation_x,validation_y,results,model,model_name,"ORIGINAL",dataset_name)
         time2 = time.time()
         delta = time2-time1
@@ -200,11 +186,14 @@ def runClassifierChain(sampling,datasetType,modelsList):
         results = pd.read_csv("results/results_classifierChain.csv")
     else:
         results =generateDf(columns)
+    #load the dataset
     test = pd.read_csv("data/"+datasetType+"/test_clean.csv")
     train = pd.read_csv("data/"+datasetType+"/train_clean.csv")
     validation = pd.read_csv("data/"+datasetType+"/validation_clean.csv")
+    #vectorize the review strings
     text_train,text_validate, text_test = vectorize_data(train, validation,test)
     datasets = generate_balanced_data(text_train,train,columns)
+    # get the training data from the dataset with the desired sampling
     datasets = {column:datasets[column][sampling] for column in columns}
 
 #Get Best Models
@@ -222,6 +211,7 @@ def runClassifierChain(sampling,datasetType,modelsList):
         print("Training model: ", model.__class__.__name__)
 
     chains = []
+    # train the models in a chain
     for i,modelname in enumerate(modelsList):
         column = columns[i]
         model =listModels[i]
@@ -240,10 +230,12 @@ def runClassifierChain(sampling,datasetType,modelsList):
     test[columns], Y_pred_ensemble >= 0.5, average="samples"
 )
     print("Ensemble Jaccard score", ensemble_jaccard_score)
+    # Evaluate the ensemble model
     average = precision_score(test[columns], Y_pred_ensemble >= 0.5, average="samples")
     f1_score1 = f1_score(test[columns], Y_pred_ensemble >= 0.5, average="samples")
     recall = recall_score(test[columns], Y_pred_ensemble >= 0.5, average="samples")
     accuracy = accuracy_score(test[columns], Y_pred_ensemble >= 0.5)
+    # create the entry for the dataframe
     entry = {"MODEL":modelsList,"DATASET":datasetType,"PRECISION":average, "ACCURACY":accuracy,"F1":f1_score1,"RECALL":recall,"MODEL_PARAMS":'','TARGET':"All"}
     results = addToDf(results,entry)
     results.to_csv("results/results_classifierChain.csv")
@@ -287,25 +279,35 @@ def generateDf(columns):
         return results
 
 if __name__ == '__main__':
+    #name of the labels *columns
     columns =["ENTREGA","OUTROS","PRODUTO","CONDICOESDERECEBIMENTO","ANUNCIO"]
+
+    #name of the datasets
     datasetsTypes = ["datasets_all","datasets_lemmatize_text","datasets_normalizeRepeatedChars",
                      "datasets_removeNulls","datasets_removeNumbers","datasets_removePonctuation","datasets_removeStopwords",
                      "datasets_removeUpper","datasets_stem_text","datasets_tokenize_text"]
+    
     results = generateDf(columns)
+
     #load the datasets and clean it
     print("runing dataAnalyse.py")
+
+    #each iteration for each dataset
     for datasetType in datasetsTypes:
         print("Running dataset: ", datasetType)
         time1 = time.time()
+        #load the datasets
         test = pd.read_csv("data/"+datasetType+"/test_clean.csv")
         train = pd.read_csv("data/"+datasetType+"/train_clean.csv")
         validation = pd.read_csv("data/"+datasetType+"/validation_clean.csv")
         #vectorize the review strings
         text_train,text_validate, text_test = vectorize_data(train, validation,test)
+        #generate balanced data for each column oversampling, undersampling and original data
         datasets = generate_balanced_data(text_train,train,columns)
-        #results = predict_all_columns(datasets,text_test,optimize_nearest_neighbours,results,columns)
-        #results =run_extra_models(datasets,text_validate,validation[columns],results,columns,datasetType)
+        results = predict_all_columns(datasets,text_test,optimize_nearest_neighbours,results,columns)
+        results =run_extra_models(datasets,text_validate,validation[columns],results,columns,datasetType)
         results = multilabel_a_lot_of_models(text_train,train[columns],text_validate,validation[columns],results,datasetType)
+        #get the best model for each column using the classifier chain method
         time2 = time.time()
         delta = time2-time1
         print(datasetType+" TimeElapsed: ", time.strftime("%H:%M:%S", time.gmtime(delta)))
