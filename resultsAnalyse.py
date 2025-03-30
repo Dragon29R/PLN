@@ -5,7 +5,7 @@ import os
 import shutil
 from models import  runClassifierChain,columns,predict_multilabel_classifier,runClassifierChain
 from sklearn.metrics import multilabel_confusion_matrix
-
+from models import modelsDic,predict_multilabel_classifier
 def plot_orderedBy(results,metric,ascending=False):
     columns =["ENTREGA","OUTROS","PRODUTO","CONDICOESDERECEBIMENTO","ANUNCIO"]
     print("Results for metric: ", metric)
@@ -85,7 +85,8 @@ def evaluateMultiLabelClassifier(model, dataset_type):
     train_df = pd.read_csv(f"data/{dataset_type}/train.csv")
     val_df = pd.read_csv(f"data/{dataset_type}/validation.csv")
     test_df = pd.read_csv(f"data/{dataset_type}/test.csv")
-    
+
+
 
 def best_performing_datasets(metric,topK,ascending=False):
     results = pd.read_csv("ResultsArchive/results.csv")
