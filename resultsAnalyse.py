@@ -134,29 +134,27 @@ def get_bar_graph_average_performance_of_datasets(df):
     plt.figure(figsize=(17, 6))
     sns.barplot(x='SAMPLING', y='HAMMING_LOSS', data=df, palette='viridis')
     plt.xlabel('Dataset Treatment')
-    plt.ylabel('Hamming Score')
+    plt.ylabel('Hamming Loss Score')
     plt.title('Average Performance of Datasets')
 
     # Set y-axis limits (lower limit set to 0.08)
-    plt.ylim(df['HAMMING_LOSS'].min()- 0.0005, df['HAMMING_LOSS'].max() + 0.00)  # Add a small margin to the upper limit
-
+    plt.ylim(df['HAMMING_LOSS'].min()- 0.0005, df['HAMMING_LOSS'].max() + 0.0005)  # Add a small margin to the upper limit
+    
+    plt.xticks(rotation=45, ha='right')
     plt.tight_layout()  # Ensure everything fits within the figure
     plt.savefig(f"plots/bar_graphs/dataset_performance.png")
-
 def get_bar_graph_average_performance_of_model(df):
     df = df.groupby("MODEL")[["ACCURACY","F1","RECALL","PRECISION","HAMMING_LOSS"]].mean().reset_index()
-
-
 
     # Plot the bar graph using seaborn
     plt.figure(figsize=(17, 6))
     sns.barplot(x='MODEL', y='HAMMING_LOSS', data=df, palette='viridis')
     plt.xlabel('model')
-    plt.ylabel('Hamming Score')
+    plt.ylabel('Hamming Loss Score')
     plt.title('Average Performance of Models')
 
     # Set y-axis limits (lower limit set to 0.08)
-    plt.ylim(df['HAMMING_LOSS'].min()- 0.01, df['HAMMING_LOSS'].max() + 0.01)  # Add a small margin to the upper limit
+    plt.ylim(df['HAMMING_LOSS'].min()- 0.01, df['HAMMING_LOSS'].max() + 0.01)  # Add a small margin to the upper limit«
 
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()  # Ensure everything fits within the figure
