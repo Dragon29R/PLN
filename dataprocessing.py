@@ -99,6 +99,22 @@ def generate_corpus(df,sw,ps):
         corpus.append(review)
     return corpus
 
+def generate_corpus_no_stemma(df,sw):
+    corpus = []
+    for i in df.index:
+        # Get review and handle non-string values
+        review = df['review_text'][i]
+        if not isinstance(review, str):  # Check if the value is not a string
+            review = ""  # Replace non-string values with an empty string
+        # get review and remove non alpha chars
+        review = re.sub('[^a-zA-Z]', ' ', review)
+        # to lower-case
+        review = review.lower()
+        # remove stop words
+        review = ' '.join([w for w in review.split() if w not in sw])
+        corpus.append(review)
+    return corpus
+
 def save_datasets(test, train, validation, folder_name):
     folder_path = os.path.join("data", folder_name)
     if not os.path.exists(folder_path):
