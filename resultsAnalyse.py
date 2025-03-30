@@ -290,7 +290,7 @@ if __name__ == '__main__':
     #get_bar_graph_of_top_k_models_by_metric(10,"F1",results)
     evaluateMultiLabelClassifier("KNeighborsClassifier","datasets_stem_text")
 
-    """
+    
     if os.path.exists("plots"):
         shutil.rmtree("plots")
     os.makedirs("plots")
@@ -308,14 +308,13 @@ if __name__ == '__main__':
     plot_BestModel_orderedBy(results,"PRECISION",ascending=False)
     plot_BestModel_orderedBy(results,"HAMMING_LOSS",ascending=True)
     """
-    """
     plot_orderedBy(results,"ACCURACY",ascending=False)
     plot_orderedBy(results,"F1",ascending=False)
     plot_orderedBy(results,"RECALL",ascending=False)
     plot_orderedBy(results,"PRECISION",ascending=False)
-    plot_orderedBy(results,"HAMMING_LOSS",ascending=True)"
+    plot_orderedBy(results,"HAMMING_LOSS",ascending=True)
     """
     dataset_without_num_train = pd.read_csv("data/datasets_removeNumbers/train_clean.csv")
     dataset_without_num_val = pd.read_csv("data/datasets_removeNumbers/validation_clean.csv")
     dataset_without_num_test = pd.read_csv("data/datasets_removeNumbers/test_clean.csv")
-    get_failed_queries_of_model(XGBClassifier(),dataset_without_num_train,dataset_without_num_val,dataset_without_num_test)
+    get_failed_queries_of_model(modelsDic["VotingClassifier"],dataset_without_num_train,dataset_without_num_val,dataset_without_num_test)
