@@ -4,10 +4,9 @@ import seaborn as sns
 import os
 import shutil
 from models import  runClassifierChain,columns,predict_multilabel_classifier,runClassifierChain
-from sklearn.metrics import multilabel_confusion_matrix
+from sklearn.metrics import multilabel_confusion_matrix,classification_report,ConfusionMatrixDisplay
 from skmultilearn.problem_transform import BinaryRelevance
-from sklearn.feature_extraction.text import TfidfVectorizer
-from models import modelsDic,predict_multilabel_classifier
+from models import modelsDic,predict_multilabel_classifier,vectorize_data
 def plot_orderedBy(results,metric,ascending=False):
     columns =["ENTREGA","OUTROS","PRODUTO","CONDICOESDERECEBIMENTO","ANUNCIO"]
     print("Results for metric: ", metric)
@@ -83,14 +82,31 @@ def best_models(metric,topK,ascending=False):
     # Step 3: Find the intersection (models common to all targets)
     common_models = set.intersection(*unique_models_per_target)
     print("\n\nCommon models for all targets:", list(common_models))
-def evaluateMultiLabelClassifier(model, dataset_type):
-    train_df = pd.read_csv(f"data/{dataset_type}/train.csv")
-    val_df = pd.read_csv(f"data/{dataset_type}/validation.csv")
-    test_df = pd.read_csv(f"data/{dataset_type}/test.csv")
+def evaluateMultiLabelClassifier(model_name, dataset_type):
+    train_df = pd.read_csv(f"data/{dataset_type}/train_clean.csv")
+    val_df = pd.read_csv(f"data/{dataset_type}/validation_clean.csv")
+    test_df = pd.read_csv(f"data/{dataset_type}/test_clean.csv")
+    model = modelsDic[model_name]
     br = BinaryRelevance(classifier=model, require_dense=[False, True])
-    br.fit(traindf, train_y)
+    train_x, val_x,test_x = vectorize_data(train_df, val_df, test_df)
+    br.fit(train_x, train_df[columns])
     predictions = br.predict(test_x)
+    os.makedirs(f"plots/ConfusionMatrix/{model_name}",exist_ok=True)
+    drawConfusionMatrix(predictions,test_df[columns],model_name)
+def drawConfusionMatrix(predictions, y_test,modelName):
+    mcm = multilabel_confusion_matrix(predictions, y_test)
 
+    # Visualize each matrix
+    
+    for i, (matrix, label) in enumerate(zip(mcm, columns)):
+        plt.figure(figsize=(5, 4))
+        sns.heatmap(matrix, annot=True, fmt='d', cmap='Blues',
+                    xticklabels=['Predicted No', 'Predicted Yes'],
+                    yticklabels=['Actual No', 'Actual Yes'])
+        plt.title(f'Confusion Matrix for {label}')
+        plt.ylabel('True label')
+        plt.xlabel('Predicted label')
+        plt.savefig(f"plots/ConfusionMatrix/{modelName}/{label}.png")
 
 def best_performing_datasets(metric,topK,ascending=False):
     results = pd.read_csv("ResultsArchive/results.csv")
@@ -130,9 +146,13 @@ if __name__ == '__main__':
     if os.path.exists("plots"):
         shutil.rmtree("plots")
     os.makedirs("plots")
+    os.makedirs("plots/ConfusionMatrix",exist_ok=True)
     #mergeResults()
     #models = getBestModelByTarget("F1",ascending=False)
     #runClassifierChain("OVERSAMPLING","datasets_stem_text",models)
+    evaluateMultiLabelClassifier("KNeighborsClassifier","datasets_stem_text")
+    evaluateMultiLabelClassifier("VotingClassifier","datasets_stem_text")
+    print("ploting ordered by")
     results = pd.read_csv("ResultsArchive/results.csv")
     plot_BestModel_orderedBy(results,"ACCURACY",ascending=False)
     plot_BestModel_orderedBy(results,"F1",ascending=False)
