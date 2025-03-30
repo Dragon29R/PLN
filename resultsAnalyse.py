@@ -153,7 +153,7 @@ if __name__ == '__main__':
     evaluateMultiLabelClassifier("KNeighborsClassifier","datasets_stem_text")
     evaluateMultiLabelClassifier("VotingClassifier","datasets_stem_text")
     print("ploting ordered by")
-    results = pd.read_csv("ResultsArchive/results.csv")
+    results = pd.read_csv("ResultsArchive/results.csv")# change this to see the statistics for the the multilabel models
     plot_BestModel_orderedBy(results,"ACCURACY",ascending=False)
     plot_BestModel_orderedBy(results,"F1",ascending=False)
     plot_BestModel_orderedBy(results,"RECALL",ascending=False)
