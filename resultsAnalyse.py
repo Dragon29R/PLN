@@ -5,6 +5,8 @@ import os
 import shutil
 from models import  runClassifierChain,columns,predict_multilabel_classifier,runClassifierChain
 from sklearn.metrics import multilabel_confusion_matrix
+from skmultilearn.problem_transform import BinaryRelevance
+from sklearn.feature_extraction.text import TfidfVectorizer
 from models import modelsDic,predict_multilabel_classifier
 def plot_orderedBy(results,metric,ascending=False):
     columns =["ENTREGA","OUTROS","PRODUTO","CONDICOESDERECEBIMENTO","ANUNCIO"]
@@ -85,7 +87,9 @@ def evaluateMultiLabelClassifier(model, dataset_type):
     train_df = pd.read_csv(f"data/{dataset_type}/train.csv")
     val_df = pd.read_csv(f"data/{dataset_type}/validation.csv")
     test_df = pd.read_csv(f"data/{dataset_type}/test.csv")
-
+    br = BinaryRelevance(classifier=model, require_dense=[False, True])
+    br.fit(traindf, train_y)
+    predictions = br.predict(test_x)
 
 
 def best_performing_datasets(metric,topK,ascending=False):
