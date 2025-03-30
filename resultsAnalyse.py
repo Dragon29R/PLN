@@ -4,11 +4,13 @@ import seaborn as sns
 import os
 import shutil
 from models import  runClassifierChain,columns,predict_multilabel_classifier,runClassifierChain
-
-def plot_orderedBy(metric,ascending=False):
+from sklearn.metrics import multilabel_confusion_matrix
+from skmultilearn.problem_transform import BinaryRelevance
+from sklearn.feature_extraction.text import TfidfVectorizer
+from models import modelsDic,predict_multilabel_classifier
+def plot_orderedBy(results,metric,ascending=False):
     columns =["ENTREGA","OUTROS","PRODUTO","CONDICOESDERECEBIMENTO","ANUNCIO"]
     print("Results for metric: ", metric)
-    results = pd.read_csv("ResultsArchive/results.csv")
     for column in columns:
         print("Results for column: ", column)
         # Plot the bar graph using seaborn
@@ -31,10 +33,21 @@ def plot_orderedBy(metric,ascending=False):
 
 def plot_BestModel_orderedBy(metric,ascending=False):
     os.makedirs("plots/BestModel")
+def mergeResults():
+    df1 = pd.read_csv("ResultsArchive/results.csv")
+    df1 = df1.rename(columns={'Sampling':'SAMPLING'})
+    df2= pd.read_csv("ResultsArchive/results_all.csv")
+    print("df1 columns:", df1.columns.tolist())
+    print("df2 columns:", df2.columns.tolist())
+    merged_df = pd.merge(df1, df2, how='outer', indicator=True)
+    merged_df.to_csv("ResultsArchive/merged_results.csv", index=False)
+
+def plot_BestModel_orderedBy(results,metric,ascending=False):
+    os.makedirs("plots/BestModel",exist_ok=True)
     os.makedirs("plots/BestModel/"+metric)
     columns =["ENTREGA","OUTROS","PRODUTO","CONDICOESDERECEBIMENTO","ANUNCIO"]
     print("Results for metric: ", metric)
-    results = pd.read_csv("ResultsArchive/results.csv")
+
     for column in columns:
         print("Results for column: ", column)
         # Plot the bar graph using seaborn
@@ -73,6 +86,15 @@ def best_models(metric,topK,ascending=False):
     # Step 3: Find the intersection (models common to all targets)
     common_models = set.intersection(*unique_models_per_target)
     print("\n\nCommon models for all targets:", list(common_models))
+def evaluateMultiLabelClassifier(model, dataset_type):
+    train_df = pd.read_csv(f"data/{dataset_type}/train.csv")
+    val_df = pd.read_csv(f"data/{dataset_type}/validation.csv")
+    test_df = pd.read_csv(f"data/{dataset_type}/test.csv")
+    br = BinaryRelevance(classifier=model, require_dense=[False, True])
+    br.fit(traindf, train_y)
+    predictions = br.predict(test_x)
+
+
 def best_performing_datasets(metric,topK,ascending=False):
     results = pd.read_csv("ResultsArchive/results.csv")
     # Step 1: Get top k models per target
@@ -102,21 +124,21 @@ def getBestModelByTarget(metric,ascending=False):
     return return1
     
 def get_bar_graph_average_performance_of_datasets(df):
-    df = df.groupby("DATASET")[["ACCURACY","F1","RECALL","PRECISION","HAMMING_LOSS"]].mean().reset_index()
+    df = df.groupby("SAMPLING")[["ACCURACY","F1","RECALL","PRECISION","HAMMING_LOSS"]].mean().reset_index()
 
     # remove everyletter until you find _ on the dataset column
-    df['DATASET'] = df['DATASET'].str.replace(r'^[^_]*_', '', regex=True)
+    df['SAMPLING'] = df['SAMPLING'].str.replace(r'^[^_]*_', '', regex=True)
 
 
     # Plot the bar graph using seaborn
     plt.figure(figsize=(17, 6))
-    sns.barplot(x='DATASET', y='HAMMING_LOSS', data=df, palette='viridis')
+    sns.barplot(x='SAMPLING', y='HAMMING_LOSS', data=df, palette='viridis')
     plt.xlabel('Dataset Treatment')
     plt.ylabel('Hamming Score')
     plt.title('Average Performance of Datasets')
 
     # Set y-axis limits (lower limit set to 0.08)
-    plt.ylim(df['HAMMING_LOSS'].min()- 0.01, df['HAMMING_LOSS'].max() + 0.01)  # Add a small margin to the upper limit
+    plt.ylim(df['HAMMING_LOSS'].min()- 0.0005, df['HAMMING_LOSS'].max() + 0.00)  # Add a small margin to the upper limit
 
     plt.tight_layout()  # Ensure everything fits within the figure
     plt.savefig(f"plots/bar_graphs/dataset_performance.png")
@@ -148,22 +170,28 @@ if __name__ == '__main__':
     # Oversampling was the best performing sampling technique
     # the best performing 'MLPClassifier', 'VotingClassifier'
 
-    results = pd.read_csv("ResultsArchive/results.csv")
+    results = pd.read_csv("ResultsArchive/results_all.csv")
     get_bar_graph_average_performance_of_datasets(results)
     get_bar_graph_average_performance_of_model(results)
 
-    """ is this?
+    """
     if os.path.exists("plots"):
         shutil.rmtree("plots")
     os.makedirs("plots")
-    models = getBestModelByTarget("F1",ascending=False)
-    runClassifierChain("OVERSAMPLING","datasets_stem_text",models)
+    #mergeResults()
+    #models = getBestModelByTarget("F1",ascending=False)
+    #runClassifierChain("OVERSAMPLING","datasets_stem_text",models)
+    results = pd.read_csv("ResultsArchive/results.csv")
+    plot_BestModel_orderedBy(results,"ACCURACY",ascending=False)
+    plot_BestModel_orderedBy(results,"F1",ascending=False)
+    plot_BestModel_orderedBy(results,"RECALL",ascending=False)
+    plot_BestModel_orderedBy(results,"PRECISION",ascending=False)
+    plot_BestModel_orderedBy(results,"HAMMING_LOSS",ascending=True)
     """
-
-
-    """plot_BestModel_orderedBy("ACCURACY",ascending=False)
-    plot_orderedBy("ACCURACY",ascending=False)
-    plot_orderedBy("F1",ascending=False)
-    plot_orderedBy("RECALL",ascending=False)
-    plot_orderedBy("PRECISION",ascending=False)
-    plot_orderedBy("HAMMING_LOSS",ascending=True)"""
+    """
+    plot_orderedBy(results,"ACCURACY",ascending=False)
+    plot_orderedBy(results,"F1",ascending=False)
+    plot_orderedBy(results,"RECALL",ascending=False)
+    plot_orderedBy(results,"PRECISION",ascending=False)
+    plot_orderedBy(results,"HAMMING_LOSS",ascending=True)"
+    """

@@ -23,8 +23,9 @@ import time
 import pandas as pd
 
 #Globals
+#target variables
 columns =["ENTREGA","OUTROS","PRODUTO","CONDICOESDERECEBIMENTO","ANUNCIO"]
-
+# models to try
 models = [
     ('KNN', KNeighborsClassifier()),
     #('Radius Neighbors', RadiusNeighborsClassifier()),
@@ -43,11 +44,31 @@ models = [
     ('Mlp-sgd', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='sgd', learning_rate='constant')),
     ('CatBoost', CatBoostClassifier(n_estimators=50,logging_level='Silent'))
     ]
-
+# add the voting classifier
 voting_estimators = [(name, model) for name, model in models]
 voting = VotingClassifier(estimators=voting_estimators, voting='soft')
 #staking = StackingClassifier(estimators=models)
 models.append(('Voting',voting))
+
+#dictionary of models
+# create a dictionary of models
+modelsDic = {
+    'KNeighborsClassifier': KNeighborsClassifier(),
+    'DecisionTreeClassifier': DecisionTreeClassifier(),
+    'SVC': SVC(probability=True),
+    'XGBClassifier': XGBClassifier(),
+    'AdaBoostClassifier': AdaBoostClassifier(algorithm='SAMME'),
+    'BaggingClassifier': BaggingClassifier( n_jobs=-1),
+    'GradientBoostingClassifier': GradientBoostingClassifier(n_estimators=50),
+    #('GaussianNB', GaussianNB()),
+    'RandomForestClassifier':RandomForestClassifier(),
+    #('Linear Discriminant Analysis', LinearDiscriminantAnalysis()),
+    #('Quadratic Discriminant Analysis', QuadraticDiscriminantAnalysis()),
+    'MLPClassifier': MLPClassifier(hidden_layer_sizes=(50,50), max_iter=500,early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant'),
+    'CatBoostClassifier': CatBoostClassifier(n_estimators=50,logging_level='Silent'),
+    'VotingClassifier': VotingClassifier(estimators=[(name, model) for name, model in models], voting='soft')
+}
+
 
 # dataset balancing
 
@@ -86,7 +107,7 @@ def nearest_neighbours(train_x,train_y,test_x,test_y, n_neighbours=5):
     recall = recall_score(test_y, predictions)
     precision = precision_score(test_y, predictions)
     return [accuracy_score1,f1,recall,precision]
-
+#create nearest neighbours model
 def optimize_nearest_neighbours(train_x,train_y,test_x,test_y):
     best_score = 0
     best_stats =[]
@@ -100,44 +121,32 @@ def optimize_nearest_neighbours(train_x,train_y,test_x,test_y):
             best_stats = stats
     return best_score, best_n , best_stats
 
-def optimize_nearest_neighbours(train_x,train_y,test_x,test_y):
-    best_score = 0
-    best_stats =[]
-    best_n = 0
-    for i in range(1,15):
-        stats = nearest_neighbours(train_x,train_y,test_x,test_y,n_neighbours=i)
-        score = stats[0]
-        if score > best_score:
-            best_score = score
-            best_n = i
-            best_stats = stats
-    return best_score, best_n , best_stats
 
-#run a lot of models
+#run all the models for each column to try to find which one works best for each column using each dataset
+    """
+    Runs all the models for each column to try to find which one works best for each column using each dataset.
+
+    Parameters
+    ----------
+    datasets : dict
+        A dictionary where the key is the column name and the value is a dictionary with the different sampling methods.
+    validation_x : array
+        The validation data.
+    validation_y : array
+        The validation labels.
+    results : DataFrame
+        The DataFrame where the results will be stored.
+    columns : list
+        The list of columns to consider.
+    dataset_type : str
+        The type of dataset (e.g. "stem_text").
+
+    Returns
+    -------
+    results : DataFrame
+        The DataFrame with the results.
+    """
 def run_extra_models(datasets,validation_x,validation_y,results,columns,dataset_type):
-    models = [
-        ('KNN', KNeighborsClassifier()),
-        #('Radius Neighbors', RadiusNeighborsClassifier()),
-        ('Decision Tree', DecisionTreeClassifier()),
-        ('SVM', SVC(probability=True)),
-        ('XGBoost', XGBClassifier()),
-        ('AdaBoost', AdaBoostClassifier(algorithm='SAMME')),
-        ('Bagging', BaggingClassifier( n_jobs=-1)),
-        ('Gradient Boosting', GradientBoostingClassifier(n_estimators=50)),
-        #('GaussianNB', GaussianNB()),
-        ('random Forest',RandomForestClassifier()),
-        #('Linear Discriminant Analysis', LinearDiscriminantAnalysis()),
-        #('Quadratic Discriminant Analysis', QuadraticDiscriminantAnalysis()),
-        ('Mlp-adam', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='adam', learning_rate='constant')),
-        ('Mlp-lbfgs', MLPClassifier(hidden_layer_sizes=(50,50), max_iter=500,early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant')),
-        ('Mlp-sgd', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='sgd', learning_rate='constant')),
-        ('CatBoost', CatBoostClassifier(n_estimators=50,logging_level='Silent'))
-    ]
-    
-    voting_estimators = [(name, model) for name, model in models]
-    voting = VotingClassifier(estimators=voting_estimators, voting='soft')
-    #staking = StackingClassifier(estimators=models)
-    models.append(('Voting',voting))
     for column in columns:
         dataset = datasets[column]
         for sampling,dataset in dataset.items():
@@ -159,7 +168,7 @@ def run_extra_models(datasets,validation_x,validation_y,results,columns,dataset_
             delta = time2-time1
             print("Time: ", time.strftime("%H:%M:%S", time.gmtime(delta)))
     return results
-#predict using multilabel classifier
+#predict using Binaryrelevance to predict multilabel using only one model for all the targets
 def predict_multilabel_classifier(train_x,train_y,test_x,test_y,results,model,model_name,dataset_name,sampling):
     br = BinaryRelevance(classifier=model, require_dense=[False, True])
     br.fit(train_x, train_y)
@@ -173,30 +182,8 @@ def predict_multilabel_classifier(train_x,train_y,test_x,test_y,results,model,mo
     print("ResultsMM: ", results)
     results = addToDf(results,entry)
     return results
+#predict using multilabel classifier for all the models for all the targets, it is faster than the previous function because it uses the same model for all columns 
 def multilabel_a_lot_of_models(train_x,train_y,validation_x,validation_y,results,dataset_name):
-    models = [
-        ('KNN', KNeighborsClassifier()),
-        #('Radius Neighbors', RadiusNeighborsClassifier()),
-        ('Decision Tree', DecisionTreeClassifier()),
-        ('SVM', SVC(probability=True)),
-        ('XGBoost', XGBClassifier()),
-        ('AdaBoost', AdaBoostClassifier(algorithm='SAMME')),
-        ('Bagging', BaggingClassifier( n_jobs=-1)),
-        ('Gradient Boosting', GradientBoostingClassifier(n_estimators=50)),
-        #('GaussianNB', GaussianNB()),
-        ('random Forest',RandomForestClassifier()),
-        #('Linear Discriminant Analysis', LinearDiscriminantAnalysis()),
-        #('Quadratic Discriminant Analysis', QuadraticDiscriminantAnalysis()),
-        ('Mlp-adam', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='adam', learning_rate='constant')),
-        ('Mlp-lbfgs', MLPClassifier(hidden_layer_sizes=(50,50), max_iter=500,early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant')),
-        ('Mlp-sgd', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='sgd', learning_rate='constant')),
-        ('CatBoost', CatBoostClassifier(n_estimators=50,logging_level='Silent'))
-    ]
-    
-    voting_estimators = [(name, model) for name, model in models]
-    voting = VotingClassifier(estimators=voting_estimators, voting='soft')
-    #staking = StackingClassifier(estimators=models)
-    models.append(('Voting',voting))
     #models.append(('Stacking',staking))
     for model_name,model in models:
         print("Running model: ", model_name)
@@ -207,7 +194,7 @@ def multilabel_a_lot_of_models(train_x,train_y,validation_x,validation_y,results
         print("Time: ", time.strftime("%H:%M:%S", time.gmtime(delta)))
         print("Results multilabel: ", results)
     return results
-
+# run classivier chain on the list of the models that 
 def runClassifierChain(sampling,datasetType,modelsList):
     if os.path.exists("results/results_classifierChain.csv"):
         results = pd.read_csv("results/results_classifierChain.csv")
@@ -221,28 +208,13 @@ def runClassifierChain(sampling,datasetType,modelsList):
     datasets = {column:datasets[column][sampling] for column in columns}
 
 #Get Best Models
-    models1 = {
-        'KNeighborsClassifier': KNeighborsClassifier(),
-        'DecisionTreeClassifier': DecisionTreeClassifier(),
-       'SVC': SVC(probability=True),
-        'XGBClassifier': XGBClassifier(),
-        'AdaBoostClassifier': AdaBoostClassifier(algorithm='SAMME'),
-        'BaggingClassifier': BaggingClassifier( n_jobs=-1),
-        'GradientBoostingClassifier': GradientBoostingClassifier(n_estimators=50),
-        #('GaussianNB', GaussianNB()),
-        'RandomForestClassifier':RandomForestClassifier(),
-        #('Linear Discriminant Analysis', LinearDiscriminantAnalysis()),
-        #('Quadratic Discriminant Analysis', QuadraticDiscriminantAnalysis()),
-        'MLPClassifier': MLPClassifier(hidden_layer_sizes=(50,50), max_iter=500,early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant'),
-        'CatBoostClassifier': CatBoostClassifier(n_estimators=50,logging_level='Silent'),
-        'VotingClassifier': VotingClassifier(estimators=[(name, model) for name, model in models], voting='soft')
-    }
+
     # Create and fit separate chains
     print("Running model: ", modelsList)
     # train the models individually
     listModels = []
     for i,modelname in enumerate(modelsList):
-        model =copy.deepcopy( models1[modelname])
+        model =copy.deepcopy( modelsDic[modelname])
         column = columns[i]
         train_x,train_y = datasets[column]
         model.fit(train_x, train_y)  # Fit on single label
@@ -299,6 +271,7 @@ def predict_all_columns(datasets,text_test,function,results,columns):
             entry = {"MODEL":function.__name__,"DATASET":dataset_type,"PRECISION":precision, "ACCURACY":accuracy,"F1":f1,"RECALL":recall,"MODEL_PARAMS":result[1],'TARGET':column}
             results = addToDf(results,entry)
     return results
+#add the entry to the dataframe
 def addToDf(results,entry):
     if results.empty:
         results = pd.DataFrame([entry])
@@ -306,6 +279,7 @@ def addToDf(results,entry):
     else:
         results = pd.concat([results, pd.DataFrame([entry]).reindex(columns=results.columns)], ignore_index=True)
     return results
+#generate the dataframe with the columns
 def generateDf(columns):
         results = pd.DataFrame([],  columns =  ["MODEL","DATASET","PRECISION", "ACCURACY","F1","RECALL","MODEL_PARAMS","TARGET"])
         results["TARGET"] = pd.Categorical([], categories=columns)
