@@ -2,9 +2,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+import numpy as np
 import shutil
 from models import  runClassifierChain,columns,predict_multilabel_classifier,runClassifierChain
-from sklearn.metrics import multilabel_confusion_matrix,classification_report,ConfusionMatrixDisplay, hamming_loss
+from sklearn.metrics import multilabel_confusion_matrix,classification_report,ConfusionMatrixDisplay, hamming_loss,confusion_matrix
 from skmultilearn.problem_transform import BinaryRelevance
 from models import modelsDic,predict_multilabel_classifier,vectorize_data
 from xgboost import XGBClassifier
@@ -99,10 +100,11 @@ def evaluateMultiLabelClassifier(model_name, dataset_type):
     drawConfusionMatrix(predictions,test_df[columns],model_name)
 def drawConfusionMatrix(predictions, y_test,modelName):
     mcm = multilabel_confusion_matrix(predictions, y_test)
-
+    create_single_confusion_matrix(mcm,modelName)
     # Visualize each matrix
     
     for i, (matrix, label) in enumerate(zip(mcm, columns)):
+        # Plot the confusion matrix for each label
         plt.figure(figsize=(5, 4))
         sns.heatmap(matrix, annot=True, fmt='d', cmap='Blues',
                     xticklabels=['Predicted No', 'Predicted Yes'],
@@ -111,6 +113,32 @@ def drawConfusionMatrix(predictions, y_test,modelName):
         plt.ylabel('True label')
         plt.xlabel('Predicted label')
         plt.savefig(f"plots/ConfusionMatrix/{modelName}/{label}.png")
+def create_single_confusion_matrix(mcm,name):
+    micro_cm = np.sum(mcm, axis=0)  # Sum all individual confusion matrices
+
+    # Plot the micro-averaged confusion matrix
+    plt.figure(figsize=(6, 6))
+    plt.imshow(micro_cm, interpolation='nearest', cmap=plt.cm.Blues)
+    plt.title('Micro-Averaged Confusion Matrix\n(Sum of all label confusion matrices)')
+    plt.colorbar()
+
+    # Add text annotations
+    thresh = micro_cm.max() / 2.
+    for i in range(micro_cm.shape[0]):
+        for j in range(micro_cm.shape[1]):
+            plt.text(j, i, format(micro_cm[i, j], 'd'),
+                    horizontalalignment="center",
+                    color="white" if micro_cm[i, j] > thresh else "black")
+
+    # Label the axes
+    class_names = ['Negative', 'Positive']
+    plt.xticks([0, 1], [f'Predicted {name}' for name in class_names])
+    plt.yticks([0, 1], [f'Actual {name}' for name in class_names])
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+
+    plt.tight_layout()
+    plt.savefig(f"plots/ConfusionMatrix/{name}/micro_averaged.png")
 
 def best_performing_datasets(metric,topK,ascending=False):
     results = pd.read_csv("ResultsArchive/results.csv")
@@ -160,52 +188,38 @@ def get_bar_graph_average_performance_of_datasets(df):
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()  # Ensure everything fits within the figure
     plt.savefig(f"plots/bar_graphs/dataset_performance.png")
-def get_bar_graph_average_performance_of_model(df):
+def get_bar_graph_average_performance_of_model(metric,df,ascending=False):
     df = df.groupby("MODEL")[["ACCURACY","F1","RECALL","PRECISION","HAMMING_LOSS"]].mean().reset_index()
-
+    df.sort_values(by=metric, ascending=ascending, inplace=True)
     # Plot the bar graph using seaborn
     plt.figure(figsize=(17, 6))
-    sns.barplot(x='MODEL', y='HAMMING_LOSS', data=df, palette='viridis')
+    sns.barplot(x='MODEL', y=metric, data=df, palette='viridis')
     plt.xlabel('model')
-    plt.ylabel('Hamming Loss Score')
+    plt.ylabel(metric+' Score')
     plt.title('Average Performance of Models')
 
     # Set y-axis limits (lower limit set to 0.08)
-    plt.ylim(df['HAMMING_LOSS'].min()- 0.01, df['HAMMING_LOSS'].max() + 0.01)  # Add a small margin to the upper limit«
+    plt.ylim(df[metric].min()- 0.01, df[metric].max() + 0.01)  # Add a small margin to the upper limit«
 
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()  # Ensure everything fits within the figure
     plt.savefig(f"plots/bar_graphs/model_performance.png")
 
-def get_bar_graph_of_top_5_models_with_datasets(df):
+def get_bar_graph_of_top_k_models_by_metric(k,metric,df,ascending=False):
     # Get the top 5 models for each dataset
-    top_5_models = df.sort_values(by='HAMMING_LOSS', ascending=True).head(5)
-    top_5_models["graph_label"] = top_5_models["MODEL"] + " with " + top_5_models["SAMPLING"]
+    top_5_models = df.sort_values(by=metric, ascending=ascending).drop_duplicates("MODEL").head(k)
+    top_5_models["graph_label"] = top_5_models["MODEL"]
     # Plotting
     plt.figure()
-    sns.barplot(x='graph_label', y='HAMMING_LOSS', data=top_5_models, palette='viridis')
+    sns.barplot(x='graph_label', y=metric, data=top_5_models, palette='viridis')
     plt.xlabel('Model')
-    plt.ylabel('Hamming Loss Score')
+    plt.ylabel(metric+' Score')
     plt.title('Top 5 Models')
-    plt.ylim(top_5_models['HAMMING_LOSS'].min()- 0.001, top_5_models['HAMMING_LOSS'].max() + 0.001)
+    plt.ylim(top_5_models[metric].min()- top_5_models[metric].min()/4, top_5_models[metric].max() + 0.001)
+        
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
     plt.savefig(f"plots/bar_graphs/top_5_models_per_dataset.png")
-
-def get_bar_graph_of_top_5_models_with_datasets_no_voting(df):
-    # Get the top 5 models for each dataset
-    top_5_models = df[(df["MODEL"] != "Voting")].sort_values(by='HAMMING_LOSS', ascending=True).head(5)
-    top_5_models["graph_label"] = top_5_models["MODEL"] + " with " + top_5_models["SAMPLING"]
-    # Plotting
-    plt.figure()
-    sns.barplot(x='graph_label', y='HAMMING_LOSS', data=top_5_models, palette='viridis')
-    plt.xlabel('Model')
-    plt.ylabel('Hamming Loss Score')
-    plt.title('Top 5 Models excuding VotingClassifier')
-    plt.ylim(top_5_models['HAMMING_LOSS'].min()- 0.001, top_5_models['HAMMING_LOSS'].max() + 0.001)
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-    plt.savefig(f"plots/bar_graphs/top_5_models_per_dataset_no_voting.png")
 
 def get_failed_queries_of_model(model, train_df, val_df, test_df):
     columns = ["ENTREGA", "OUTROS", "PRODUTO", "CONDICOESDERECEBIMENTO", "ANUNCIO"]
@@ -222,15 +236,15 @@ def get_failed_queries_of_model(model, train_df, val_df, test_df):
     train_X, val_X, test_X = vectorize_data(train_df, val_df, test_df)
 
     # Ensure labels are numeric
-    train_y = train_df[columns].fillna(0).astype(int)
-    val_y = val_df[columns].fillna(0).astype(int)
-    test_y = test_df[columns].fillna(0).astype(int)
+    train_y = train_df[columns]
+    val_y = val_df[columns]
+    test_y = test_df[columns]
 
     # Create a Binary Relevance classifier with the specified model
     br = BinaryRelevance(classifier=model, require_dense=[False, True])
 
     # Fit the model on the training data
-    br.fit(train_X, train_y)
+    br.fit(train_X, train_df[columns])
 
     # Predict on the validation and test data
     val_predictions = br.predict(val_X)
@@ -270,10 +284,11 @@ if __name__ == '__main__':
     # the best performing 'MLPClassifier', 'VotingClassifier'
 
     results = pd.read_csv("ResultsArchive/results_all.csv")
-    get_bar_graph_average_performance_of_datasets(results)
-    get_bar_graph_average_performance_of_model(results)
-    get_bar_graph_of_top_5_models_with_datasets(results)
-    get_bar_graph_of_top_5_models_with_datasets_no_voting(results)
+    #get_bar_graph_average_performance_of_datasets(results)
+    #get_bar_graph_average_performance_of_model("F1",results)
+    
+    #get_bar_graph_of_top_k_models_by_metric(10,"F1",results)
+    evaluateMultiLabelClassifier("KNeighborsClassifier","datasets_stem_text")
 
     """
     if os.path.exists("plots"):
