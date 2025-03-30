@@ -33,7 +33,7 @@ def plot_orderedBy(results,metric,ascending=False):
         plt.show()
 
 def plot_BestModel_orderedBy(metric,ascending=False):
-    os.makedirs("plots/BestModel")
+    os.makedirs("plots/BestModel",exist_ok=True)
 def mergeResults():
     df1 = pd.read_csv("ResultsArchive/results.csv")
     df1 = df1.rename(columns={'Sampling':'SAMPLING'})
@@ -45,7 +45,7 @@ def mergeResults():
 
 def plot_BestModel_orderedBy(results,metric,ascending=False):
     os.makedirs("plots/BestModel",exist_ok=True)
-    os.makedirs("plots/BestModel/"+metric)
+    os.makedirs("plots/BestModel/"+metric,exist_ok=True)
     columns =["ENTREGA","OUTROS","PRODUTO","CONDICOESDERECEBIMENTO","ANUNCIO"]
     print("Results for metric: ", metric)
 
@@ -192,14 +192,14 @@ def get_bar_graph_average_performance_of_model(metric,df,ascending=False):
     df = df.groupby("MODEL")[["ACCURACY","F1","RECALL","PRECISION","HAMMING_LOSS"]].mean().reset_index()
     df.sort_values(by=metric, ascending=ascending, inplace=True)
     # Plot the bar graph using seaborn
-    plt.figure(figsize=(17, 6))
+    plt.figure()
     sns.barplot(x='MODEL', y=metric, data=df, palette='viridis')
     plt.xlabel('model')
     plt.ylabel(metric+' Score')
     plt.title('Average Performance of Models')
 
     # Set y-axis limits (lower limit set to 0.08)
-    plt.ylim(df[metric].min()- 0.01, df[metric].max() + 0.01)  # Add a small margin to the upper limit«
+    plt.ylim(df[metric].min()- df[metric].min()/4, df[metric].max() + 0.01)  # Add a small margin to the upper limit«
 
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()  # Ensure everything fits within the figure
@@ -284,16 +284,15 @@ if __name__ == '__main__':
     # the best performing 'MLPClassifier', 'VotingClassifier'
 
     results = pd.read_csv("ResultsArchive/results_all.csv")
-    #get_bar_graph_average_performance_of_datasets(results)
-    #get_bar_graph_average_performance_of_model("F1",results)
+    os.makedirs("plots/bar_graphs",exist_ok=True)
+    get_bar_graph_average_performance_of_datasets(results)
+    get_bar_graph_average_performance_of_model("F1",results)
     
     #get_bar_graph_of_top_k_models_by_metric(10,"F1",results)
     evaluateMultiLabelClassifier("KNeighborsClassifier","datasets_stem_text")
 
     
-    if os.path.exists("plots"):
-        shutil.rmtree("plots")
-    os.makedirs("plots")
+    os.makedirs("plots",exist_ok=True)
     os.makedirs("plots/ConfusionMatrix",exist_ok=True)
     #mergeResults()
     #models = getBestModelByTarget("F1",ascending=False)
