@@ -49,6 +49,25 @@ voting = VotingClassifier(estimators=voting_estimators, voting='soft')
 #staking = StackingClassifier(estimators=models)
 models.append(('Voting',voting))
 
+#dictionary of models
+models1 = {
+    'KNeighborsClassifier': KNeighborsClassifier(),
+    'DecisionTreeClassifier': DecisionTreeClassifier(),
+    'SVC': SVC(probability=True),
+    'XGBClassifier': XGBClassifier(),
+    'AdaBoostClassifier': AdaBoostClassifier(algorithm='SAMME'),
+    'BaggingClassifier': BaggingClassifier( n_jobs=-1),
+    'GradientBoostingClassifier': GradientBoostingClassifier(n_estimators=50),
+    #('GaussianNB', GaussianNB()),
+    'RandomForestClassifier':RandomForestClassifier(),
+    #('Linear Discriminant Analysis', LinearDiscriminantAnalysis()),
+    #('Quadratic Discriminant Analysis', QuadraticDiscriminantAnalysis()),
+    'MLPClassifier': MLPClassifier(hidden_layer_sizes=(50,50), max_iter=500,early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant'),
+    'CatBoostClassifier': CatBoostClassifier(n_estimators=50,logging_level='Silent'),
+    'VotingClassifier': VotingClassifier(estimators=[(name, model) for name, model in models], voting='soft')
+}
+
+
 # dataset balancing
 
 def undersampling(train_x,train_y):
@@ -115,29 +134,6 @@ def optimize_nearest_neighbours(train_x,train_y,test_x,test_y):
 
 #run a lot of models
 def run_extra_models(datasets,validation_x,validation_y,results,columns,dataset_type):
-    models = [
-        ('KNN', KNeighborsClassifier()),
-        #('Radius Neighbors', RadiusNeighborsClassifier()),
-        ('Decision Tree', DecisionTreeClassifier()),
-        ('SVM', SVC(probability=True)),
-        ('XGBoost', XGBClassifier()),
-        ('AdaBoost', AdaBoostClassifier(algorithm='SAMME')),
-        ('Bagging', BaggingClassifier( n_jobs=-1)),
-        ('Gradient Boosting', GradientBoostingClassifier(n_estimators=50)),
-        #('GaussianNB', GaussianNB()),
-        ('random Forest',RandomForestClassifier()),
-        #('Linear Discriminant Analysis', LinearDiscriminantAnalysis()),
-        #('Quadratic Discriminant Analysis', QuadraticDiscriminantAnalysis()),
-        ('Mlp-adam', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='adam', learning_rate='constant')),
-        ('Mlp-lbfgs', MLPClassifier(hidden_layer_sizes=(50,50), max_iter=500,early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant')),
-        ('Mlp-sgd', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='sgd', learning_rate='constant')),
-        ('CatBoost', CatBoostClassifier(n_estimators=50,logging_level='Silent'))
-    ]
-    
-    voting_estimators = [(name, model) for name, model in models]
-    voting = VotingClassifier(estimators=voting_estimators, voting='soft')
-    #staking = StackingClassifier(estimators=models)
-    models.append(('Voting',voting))
     for column in columns:
         dataset = datasets[column]
         for sampling,dataset in dataset.items():
@@ -174,29 +170,6 @@ def predict_multilabel_classifier(train_x,train_y,test_x,test_y,results,model,mo
     results = addToDf(results,entry)
     return results
 def multilabel_a_lot_of_models(train_x,train_y,validation_x,validation_y,results,dataset_name):
-    models = [
-        ('KNN', KNeighborsClassifier()),
-        #('Radius Neighbors', RadiusNeighborsClassifier()),
-        ('Decision Tree', DecisionTreeClassifier()),
-        ('SVM', SVC(probability=True)),
-        ('XGBoost', XGBClassifier()),
-        ('AdaBoost', AdaBoostClassifier(algorithm='SAMME')),
-        ('Bagging', BaggingClassifier( n_jobs=-1)),
-        ('Gradient Boosting', GradientBoostingClassifier(n_estimators=50)),
-        #('GaussianNB', GaussianNB()),
-        ('random Forest',RandomForestClassifier()),
-        #('Linear Discriminant Analysis', LinearDiscriminantAnalysis()),
-        #('Quadratic Discriminant Analysis', QuadraticDiscriminantAnalysis()),
-        ('Mlp-adam', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='adam', learning_rate='constant')),
-        ('Mlp-lbfgs', MLPClassifier(hidden_layer_sizes=(50,50), max_iter=500,early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant')),
-        ('Mlp-sgd', MLPClassifier(hidden_layer_sizes=(50,50), early_stopping=True, n_iter_no_change=5, solver='sgd', learning_rate='constant')),
-        ('CatBoost', CatBoostClassifier(n_estimators=50,logging_level='Silent'))
-    ]
-    
-    voting_estimators = [(name, model) for name, model in models]
-    voting = VotingClassifier(estimators=voting_estimators, voting='soft')
-    #staking = StackingClassifier(estimators=models)
-    models.append(('Voting',voting))
     #models.append(('Stacking',staking))
     for model_name,model in models:
         print("Running model: ", model_name)
@@ -221,22 +194,7 @@ def runClassifierChain(sampling,datasetType,modelsList):
     datasets = {column:datasets[column][sampling] for column in columns}
 
 #Get Best Models
-    models1 = {
-        'KNeighborsClassifier': KNeighborsClassifier(),
-        'DecisionTreeClassifier': DecisionTreeClassifier(),
-       'SVC': SVC(probability=True),
-        'XGBClassifier': XGBClassifier(),
-        'AdaBoostClassifier': AdaBoostClassifier(algorithm='SAMME'),
-        'BaggingClassifier': BaggingClassifier( n_jobs=-1),
-        'GradientBoostingClassifier': GradientBoostingClassifier(n_estimators=50),
-        #('GaussianNB', GaussianNB()),
-        'RandomForestClassifier':RandomForestClassifier(),
-        #('Linear Discriminant Analysis', LinearDiscriminantAnalysis()),
-        #('Quadratic Discriminant Analysis', QuadraticDiscriminantAnalysis()),
-        'MLPClassifier': MLPClassifier(hidden_layer_sizes=(50,50), max_iter=500,early_stopping=True, n_iter_no_change=5, solver='lbfgs', learning_rate='constant'),
-        'CatBoostClassifier': CatBoostClassifier(n_estimators=50,logging_level='Silent'),
-        'VotingClassifier': VotingClassifier(estimators=[(name, model) for name, model in models], voting='soft')
-    }
+
     # Create and fit separate chains
     print("Running model: ", modelsList)
     # train the models individually

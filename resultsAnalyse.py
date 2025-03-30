@@ -4,6 +4,7 @@ import seaborn as sns
 import os
 import shutil
 from models import  runClassifierChain,columns,predict_multilabel_classifier,runClassifierChain
+from sklearn.metrics import multilabel_confusion_matrix
 
 def plot_orderedBy(results,metric,ascending=False):
     columns =["ENTREGA","OUTROS","PRODUTO","CONDICOESDERECEBIMENTO","ANUNCIO"]
@@ -80,6 +81,12 @@ def best_models(metric,topK,ascending=False):
     # Step 3: Find the intersection (models common to all targets)
     common_models = set.intersection(*unique_models_per_target)
     print("\n\nCommon models for all targets:", list(common_models))
+def evaluateMultiLabelClassifier(model, dataset_type):
+    train_df = pd.read_csv(f"data/{dataset_type}/train.csv")
+    val_df = pd.read_csv(f"data/{dataset_type}/validation.csv")
+    test_df = pd.read_csv(f"data/{dataset_type}/test.csv")
+    
+
 def best_performing_datasets(metric,topK,ascending=False):
     results = pd.read_csv("ResultsArchive/results.csv")
     # Step 1: Get top k models per target
