@@ -4,10 +4,11 @@ import seaborn as sns
 import os
 import shutil
 from models import  runClassifierChain,columns,predict_multilabel_classifier,runClassifierChain
-from sklearn.metrics import multilabel_confusion_matrix
+from sklearn.metrics import multilabel_confusion_matrix, hamming_loss
 from skmultilearn.problem_transform import BinaryRelevance
 from sklearn.feature_extraction.text import TfidfVectorizer
-from models import modelsDic,predict_multilabel_classifier
+from models import modelsDic,predict_multilabel_classifier, vectorize_data
+from xgboost import XGBClassifier
 def plot_orderedBy(results,metric,ascending=False):
     columns =["ENTREGA","OUTROS","PRODUTO","CONDICOESDERECEBIMENTO","ANUNCIO"]
     print("Results for metric: ", metric)
@@ -160,6 +161,90 @@ def get_bar_graph_average_performance_of_model(df):
     plt.tight_layout()  # Ensure everything fits within the figure
     plt.savefig(f"plots/bar_graphs/model_performance.png")
 
+def get_bar_graph_of_top_5_models_with_datasets(df):
+    # Get the top 5 models for each dataset
+    top_5_models = df.sort_values(by='HAMMING_LOSS', ascending=True).head(5)
+    top_5_models["graph_label"] = top_5_models["MODEL"] + " with " + top_5_models["SAMPLING"]
+    # Plotting
+    plt.figure()
+    sns.barplot(x='graph_label', y='HAMMING_LOSS', data=top_5_models, palette='viridis')
+    plt.xlabel('Model')
+    plt.ylabel('Hamming Loss Score')
+    plt.title('Top 5 Models')
+    plt.ylim(top_5_models['HAMMING_LOSS'].min()- 0.001, top_5_models['HAMMING_LOSS'].max() + 0.001)
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    plt.savefig(f"plots/bar_graphs/top_5_models_per_dataset.png")
+
+def get_bar_graph_of_top_5_models_with_datasets_no_voting(df):
+    # Get the top 5 models for each dataset
+    top_5_models = df[(df["MODEL"] != "Voting")].sort_values(by='HAMMING_LOSS', ascending=True).head(5)
+    top_5_models["graph_label"] = top_5_models["MODEL"] + " with " + top_5_models["SAMPLING"]
+    # Plotting
+    plt.figure()
+    sns.barplot(x='graph_label', y='HAMMING_LOSS', data=top_5_models, palette='viridis')
+    plt.xlabel('Model')
+    plt.ylabel('Hamming Loss Score')
+    plt.title('Top 5 Models excuding VotingClassifier')
+    plt.ylim(top_5_models['HAMMING_LOSS'].min()- 0.001, top_5_models['HAMMING_LOSS'].max() + 0.001)
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    plt.savefig(f"plots/bar_graphs/top_5_models_per_dataset_no_voting.png")
+
+def get_failed_queries_of_model(model, train_df, val_df, test_df):
+    columns = ["ENTREGA", "OUTROS", "PRODUTO", "CONDICOESDERECEBIMENTO", "ANUNCIO"]
+
+    # remove every row with the col INADEQUADA 1
+    train_df = train_df[train_df["INADEQUADA"] != 1]
+    val_df = val_df[val_df["INADEQUADA"] != 1]
+    test_df = test_df[test_df["INADEQUADA"] != 1]
+    # remove the column INADEQUADA
+    train_df = train_df.drop(columns=["INADEQUADA"])
+    val_df = val_df.drop(columns=["INADEQUADA"])
+    test_df = test_df.drop(columns=["INADEQUADA"])
+    # Vectorize the text data (convert to numeric format)
+    train_X, val_X, test_X = vectorize_data(train_df, val_df, test_df)
+
+    # Ensure labels are numeric
+    train_y = train_df[columns].fillna(0).astype(int)
+    val_y = val_df[columns].fillna(0).astype(int)
+    test_y = test_df[columns].fillna(0).astype(int)
+
+    # Create a Binary Relevance classifier with the specified model
+    br = BinaryRelevance(classifier=model, require_dense=[False, True])
+
+    # Fit the model on the training data
+    br.fit(train_X, train_y)
+
+    # Predict on the validation and test data
+    val_predictions = br.predict(val_X)
+    test_predictions = br.predict(test_X)
+
+    # Convert predictions to dense format for comparison
+    val_predictions = val_predictions.toarray()
+    test_predictions = test_predictions.toarray()
+
+    # Print predictions
+    hamming_loss1 = hamming_loss(test_y, test_predictions)
+    print("Hamming Loss:", hamming_loss1)
+
+    # Identify mislabeled reviews in the validation set
+    val_mislabeled_indices = (val_predictions != val_y.values).any(axis=1)
+    val_mislabeled_reviews = val_df[val_mislabeled_indices].copy()
+    val_mislabeled_reviews["True Labels"] = val_y[val_mislabeled_indices].values.tolist()
+    val_mislabeled_reviews["Predicted Labels"] = val_predictions[val_mislabeled_indices].tolist()
+
+    # Identify mislabeled reviews in the test set
+    test_mislabeled_indices = (test_predictions != test_y.values).any(axis=1)
+    test_mislabeled_reviews = test_df[test_mislabeled_indices].copy()
+    test_mislabeled_reviews["True Labels"] = test_y[test_mislabeled_indices].values.tolist()
+    test_mislabeled_reviews["Predicted Labels"] = test_predictions[test_mislabeled_indices].tolist()
+
+    # Combine validation and test mislabeled reviews into a single DataFrame
+    mislabeled_reviews = pd.concat([val_mislabeled_reviews, test_mislabeled_reviews], ignore_index=True)
+
+    # Save the mislabeled reviews to a CSV file
+    mislabeled_reviews.to_csv("ResultsArchive/mislabeled_reviews_with_predictions.csv", index=False)
 
 if __name__ == '__main__':
     #best_models("ACCURACY",5,ascending=False)
@@ -171,6 +256,8 @@ if __name__ == '__main__':
     results = pd.read_csv("ResultsArchive/results_all.csv")
     get_bar_graph_average_performance_of_datasets(results)
     get_bar_graph_average_performance_of_model(results)
+    get_bar_graph_of_top_5_models_with_datasets(results)
+    get_bar_graph_of_top_5_models_with_datasets_no_voting(results)
 
     """
     if os.path.exists("plots"):
@@ -193,3 +280,7 @@ if __name__ == '__main__':
     plot_orderedBy(results,"PRECISION",ascending=False)
     plot_orderedBy(results,"HAMMING_LOSS",ascending=True)"
     """
+    dataset_without_num_train = pd.read_csv("data/datasets_removeNumbers/train_clean.csv")
+    dataset_without_num_val = pd.read_csv("data/datasets_removeNumbers/validation_clean.csv")
+    dataset_without_num_test = pd.read_csv("data/datasets_removeNumbers/test_clean.csv")
+    get_failed_queries_of_model(XGBClassifier(),dataset_without_num_train,dataset_without_num_val,dataset_without_num_test)
