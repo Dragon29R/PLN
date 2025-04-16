@@ -2,5 +2,7 @@
 /catboost_info
 /__pycache__
 /data
+/resultsTransformer
+/finetunedTransformer_1
 
 
