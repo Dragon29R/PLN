@@ -4,5 +4,7 @@
 /data
 /resultsTransformer
 /finetunedTransformer_1
+/Large_Bert_model
+/lora_portuguese_model
 
 
